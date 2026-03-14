@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<title>Grey Harbor — Intelligence Training Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', system-ui, sans-serif; background: #0A0F1A; color: #D1D5DB; overflow: hidden; height: 100vh; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.fade-in { animation: fadeIn 0.3s ease-out; }
+
+/* WELCOME */
+.welcome-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+.welcome-inner { max-width:620px; width:100%; background:#111827; border-radius:12px; border:1px solid #1F2937; overflow:hidden; }
+.welcome-header { background:linear-gradient(135deg,#1E3A5F 0%,#0A0F1A 100%); padding:32px 28px 24px; border-bottom:1px solid #1F2937; }
+.class-tag { font-size:10px; letter-spacing:2px; color:#EF4444; font-weight:700; margin-bottom:12px; font-family:'JetBrains Mono',monospace; }
+.welcome-title { font-size:36px; font-weight:800; color:#F9FAFB; letter-spacing:2px; font-family:'Space Grotesk',system-ui; }
+.welcome-sub { font-size:14px; color:#9CA3AF; margin-top:4px; }
+.welcome-body { padding:24px 28px; }
+.welcome-text { font-size:13px; line-height:1.7; color:#D1D5DB; margin-bottom:14px; }
+.pir-box { background:#0D1117; border:1px solid #1F2937; border-radius:8px; padding:14px; margin:16px 0; }
+.pir-title { font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+.pir-row { display:flex; gap:8px; padding:3px 0; }
+.pir-id { font-size:11px; color:#4A7BF7; font-weight:700; min-width:44px; font-family:'JetBrains Mono',monospace; }
+.pir-label { font-size:12px; color:#9CA3AF; }
+.api-key-section { margin:16px 0; padding:14px; background:#0D1117; border:1px solid #1F2937; border-radius:8px; }
+.api-key-label { font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+.api-key-desc { font-size:11px; color:#6B7280; margin-bottom:8px; }
+.api-key-input { width:100%; background:#111827; border:1px solid #374151; border-radius:6px; padding:8px 10px; font-size:12px; color:#D1D5DB; font-family:'JetBrains Mono',monospace; outline:none; }
+.api-key-input:focus { border-color:#4A7BF7; }
+.start-btn { width:100%; padding:14px 24px; background:linear-gradient(135deg,#1E3A5F,#4A7BF7); color:#F9FAFB; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; letter-spacing:1px; margin-top:8px; }
+.start-btn:hover { filter:brightness(1.1); }
+
+/* LAYOUT */
+.layout { display:flex; height:100vh; overflow:hidden; }
+.left-panel { width:280px; background:#111827; border-right:1px solid #1F2937; padding:14px; overflow-y:auto; flex-shrink:0; }
+.center-panel { flex:1; overflow-y:auto; padding:20px; }
+.center-inner { max-width:640px; margin:0 auto; }
+.right-panel { width:220px; background:#111827; border-left:1px solid #1F2937; padding:14px; overflow-y:auto; flex-shrink:0; }
+.panel-title { font-size:10px; font-weight:700; color:#6B7280; letter-spacing:2px; text-transform:uppercase; margin-bottom:12px; }
+
+/* AGENT CARDS */
+.agent-card { background:#0D1117; border:1px solid #1F2937; border-radius:8px; padding:10px; margin-bottom:8px; }
+.agent-header { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.agent-name { font-size:12px; font-weight:700; }
+.agent-layer { font-size:9px; color:#6B7280; }
+.agent-output { font-size:11px; line-height:1.5; white-space:pre-wrap; }
+.loading-dot { width:6px; height:6px; border-radius:50%; margin-left:auto; animation:pulse 1s infinite; }
+.loading-text { font-size:11px; color:#6B7280; font-style:italic; }
+.authority-boundary { display:flex; align-items:center; gap:8px; margin:12px 0 6px; }
+.boundary-line { flex:1; height:1px; background:#EF4444; opacity:0.4; }
+.boundary-label { font-size:9px; color:#EF4444; font-weight:700; letter-spacing:1px; white-space:nowrap; }
+.your-decision { text-align:center; font-size:11px; color:#9CA3AF; font-weight:600; }
+
+/* INTEL CARD */
+.intel-card { background:#111827; border:1px solid #1F2937; border-radius:10px; padding:18px; margin-bottom:16px; }
+.intel-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.intel-meta { display:flex; gap:8px; align-items:center; }
+.type-badge { font-size:10px; font-weight:700; padding:3px 8px; border-radius:4px; letter-spacing:1px; }
+.reliability-badge { font-size:11px; font-weight:700; }
+.timestamp-badge { font-size:11px; color:#6B7280; font-family:'JetBrains Mono',monospace; }
+.item-counter { font-size:11px; color:#6B7280; }
+.item-id { font-size:14px; font-weight:700; color:#F9FAFB; margin-bottom:8px; font-family:'JetBrains Mono',monospace; }
+.item-summary { font-size:14px; line-height:1.7; color:#E5E7EB; }
+
+/* ACTIONS */
+.action-area { background:#111827; border:1px solid #1F2937; border-radius:10px; padding:18px; }
+.action-title { font-size:12px; font-weight:700; color:#9CA3AF; margin-bottom:10px; text-transform:uppercase; letter-spacing:1px; }
+.action-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
+.action-btn { display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 8px; background:transparent; border:1px solid #374151; border-radius:8px; cursor:pointer; transition:all 0.2s; color:#D1D5DB; font-family:inherit; }
+.action-btn:hover { border-color:#6B7280; }
+.action-btn.selected { background:rgba(74,123,247,0.1); border-color:#4A7BF7; }
+.action-btn .icon { font-size:16px; }
+.action-btn .label { font-size:10px; font-weight:600; }
+.correlate-area { margin-bottom:10px; }
+.correlate-title { font-size:11px; color:#9CA3AF; margin-bottom:6px; }
+.correlate-chips { display:flex; flex-wrap:wrap; gap:4px; }
+.correlate-chip { font-size:10px; padding:4px 8px; border-radius:4px; border:1px solid #374151; background:transparent; color:#D1D5DB; cursor:pointer; font-family:'JetBrains Mono',monospace; }
+.correlate-chip.selected { border-color:#9B59B6; background:rgba(155,89,182,0.12); }
+.rationale-input { width:100%; background:#0D1117; border:1px solid #374151; border-radius:6px; padding:8px 10px; font-size:12px; color:#D1D5DB; font-family:'DM Sans',system-ui; resize:vertical; outline:none; margin-bottom:10px; }
+.rationale-input:focus { border-color:#4A7BF7; }
+.submit-row { display:flex; justify-content:flex-end; gap:8px; }
+.submit-btn { padding:10px 24px; background:#4A7BF7; color:#F9FAFB; border:none; border-radius:6px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
+.submit-btn:disabled { opacity:0.4; cursor:default; }
+.submit-btn:hover:not(:disabled) { filter:brightness(1.1); }
+.change-btn { padding:10px 20px; background:transparent; color:#E67E22; border:1px solid #E67E22; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
+
+/* CHALLENGE */
+.challenge-card { background:rgba(124,45,18,0.06); border:1px solid #E67E22; border-radius:8px; padding:14px; margin:10px 0; }
+.challenge-header { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.challenge-label { font-size:12px; font-weight:700; color:#E67E22; }
+.challenge-text { font-size:13px; line-height:1.6; color:#FBBF24; }
+
+/* FEEDBACK */
+.feedback-area { background:#111827; border:1px solid #1F2937; border-radius:10px; padding:18px; }
+.feedback-header { padding-left:12px; margin-bottom:14px; }
+.feedback-result { font-size:16px; font-weight:800; letter-spacing:1px; }
+.feedback-action { display:block; font-size:11px; color:#6B7280; margin-top:2px; }
+.coach-output { margin-bottom:14px; }
+.coach-header { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.coach-label { font-size:12px; font-weight:700; color:#27AE60; }
+.coach-text { font-size:13px; line-height:1.6; color:#D1D5DB; white-space:pre-wrap; }
+.teaching-point { background:#0D1117; border:1px solid #1F2937; border-radius:8px; padding:12px; margin-bottom:14px; }
+.tp-label { font-size:9px; font-weight:700; color:#4A7BF7; letter-spacing:1px; margin-bottom:4px; }
+.tp-text { font-size:13px; line-height:1.6; color:#E5E7EB; font-style:italic; }
+.next-btn { width:100%; padding:12px; background:#1F2937; color:#F9FAFB; border:1px solid #374151; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
+.next-btn:hover { background:#374151; }
+
+/* RIGHT PANEL */
+.rp-section { margin-bottom:16px; }
+.rp-section-title { font-size:10px; font-weight:700; color:#6B7280; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; }
+.perf-row { display:flex; justify-content:space-between; font-size:11px; padding:3px 0; border-bottom:1px solid rgba(31,41,55,0.25); }
+.perf-val { font-weight:700; font-family:'JetBrains Mono',monospace; }
+.badge-progress { margin-bottom:8px; }
+.badge-progress-header { display:flex; justify-content:space-between; align-items:center; font-size:10px; margin-bottom:3px; }
+.mini-tier { font-size:8px; font-weight:800; padding:1px 4px; border-radius:3px; color:#1F2937; }
+.progress-bar { height:4px; background:#1F2937; border-radius:2px; overflow:hidden; }
+.progress-fill { height:100%; border-radius:2px; transition:width 0.5s; }
+.log-entry { padding:6px 0; border-bottom:1px solid rgba(31,41,55,0.25); }
+.log-top { display:flex; align-items:center; gap:6px; }
+.log-type { font-size:8px; font-weight:700; padding:1px 4px; border-radius:3px; letter-spacing:0.5px; }
+.log-id { font-size:10px; color:#9CA3AF; font-family:'JetBrains Mono',monospace; }
+.log-result { margin-left:auto; font-size:8px; }
+.log-action { font-size:10px; margin-top:2px; font-weight:500; }
+.no-items { font-size:11px; color:#4B5563; font-style:italic; }
+
+/* SUMMARY */
+.summary-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:20px; }
+.stat-card { background:#0D1117; border:1px solid #1F2937; border-radius:8px; padding:14px; text-align:center; }
+.stat-num { font-size:28px; font-weight:800; color:#F9FAFB; }
+.stat-label { font-size:10px; color:#6B7280; margin-top:4px; text-transform:uppercase; letter-spacing:1px; }
+.badge-summary { background:#0D1117; border:1px solid #1F2937; border-radius:8px; padding:14px; }
+.badge-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(31,41,55,0.25); font-size:13px; }
+.tier-badge { font-size:11px; font-weight:700; padding:3px 10px; border-radius:4px; }
+
+/* Mode indicator */
+.mode-indicator { font-size:9px; padding:2px 6px; border-radius:3px; font-weight:600; margin-left:auto; }
+</style>
+<style>
+/* MOBILE OVERRIDES */
+@media (max-width: 899px) {
+  html, body { overflow: auto !important; height: auto !important; background: #eef0f4 !important; color: #1a1d2e !important; }
+  #app { min-height: 100vh; background: #eef0f4; }
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const TYPE_COLORS = {
+  HUMINT: { bg:"#92400E", text:"#FDE68A" },
+  SIGINT: { bg:"#1E3A5F", text:"#93C5FD" },
+  IMINT: { bg:"#14532D", text:"#86EFAC" },
+  OSINT: { bg:"#44403C", text:"#D6D3D1" },
+  CYBER: { bg:"#7F1D1D", text:"#FCA5A5" },
+};
+const REL_COLORS = { High:"#22C55E", Credible:"#22C55E", Med:"#EAB308", Low:"#EF4444", Routine:"#6B7280", Unverified:"#EF4444" };
+const RESULT_COLORS = { correct:"#22C55E", acceptable:"#EAB308", wrong:"#EF4444" };
+const RESULT_LABELS = { correct:"CORRECT", acceptable:"ACCEPTABLE", wrong:"INCORRECT" };
+
+const ACTIONS = [
+  { id:"ELEVATE", label:"Elevate to Commander", icon:"⬆️", color:"#E74C3C" },
+  { id:"CORRELATE", label:"Correlate", icon:"🔗", color:"#9B59B6" },
+  { id:"FLAG_AMBIGUOUS", label:"Flag Ambiguous", icon:"⚠️", color:"#E67E22" },
+  { id:"DEFER", label:"Defer", icon:"⏸️", color:"#95A5A6" },
+  { id:"DISMISS", label:"Dismiss", icon:"✕", color:"#7F8C8D" },
+  { id:"REQUEST_COLLECTION", label:"Request Collection", icon:"📡", color:"#3498DB" },
+];
+
+const SCORING_CATS = [
+  { id:"SIGNAL_DISCIPLINE", label:"Signal Discipline", icon:"📡", items:[2,4,5,8], thresholds:{bronze:0.5,silver:0.75,gold:1.0} },
+  { id:"CORROBORATION_SKILL", label:"Corroboration", icon:"🔗", items:[3,7,11,15,16,18,26], thresholds:{bronze:0.43,silver:0.71,gold:1.0} },
+  { id:"ESCALATION_JUDGMENT", label:"Escalation Judgment", icon:"⬆️", items:[9,10,12,13,17,19,20,22,23,25,27], thresholds:{bronze:0.55,silver:0.73,gold:0.91} },
+  { id:"DECEPTION_DETECTION", label:"Deception Detection", icon:"🎭", items:[2,15,23,28], thresholds:{bronze:0.5,silver:0.75,gold:1.0} },
+  { id:"FALSE_NEG_AVOIDANCE", label:"False Neg Avoidance", icon:"🛡️", items:[9,12,13,17,21,25,27], thresholds:{bronze:0.71,silver:0.86,gold:1.0} },
+];
+
+
+// ─── INTEL ITEMS (all 28) ────────────────────────────────────────────────────
+const ITEMS=[{index:1,item_id:"GH-HUM-014",type:"HUMINT",reliability:"Credible",timestamp:"0730",summary:"Unidentified trucks unloading long, wooden, sealed crates at a disused fuel depot east of Larni at night.",ideal_action:"FLAG_AMBIGUOUS",acceptable_actions:["FLAG_AMBIGUOUS","REQUEST_COLLECTION"],correlation_targets:[],threat_track:"LOGISTICS",ccir_match:["PIR-5"],difficulty:"medium",teaching_point:"First reports in a new situation should be flagged, not dismissed. Absence of corroboration is not evidence of irrelevance.",feedback:{ELEVATE:"Elevating a single uncorroborated HUMINT report risks alert fatigue. Better to flag as ambiguous and request imagery.",CORRELATE:"No prior items exist to correlate against—this is the first report.",FLAG_AMBIGUOUS:"Correct. Credible source, concerning indicators, but single-source and unverified.",DEFER:"Deferring a credible HUMINT report about unusual nighttime activity is too passive.",DISMISS:"Dangerous. Credible-rated HUMINT with multiple concerning details should not be dismissed.",REQUEST_COLLECTION:"Good judgment. Requesting follow-up ISR would provide corroboration."}},{index:2,item_id:"GH-OSINT-221",type:"OSINT",reliability:"Low",timestamp:"1615",summary:"Social media post claiming military equipment arrival; blurred photo likely recycled from prior year.",ideal_action:"DISMISS",acceptable_actions:["DISMISS","FLAG_AMBIGUOUS"],correlation_targets:["GH-HUM-014"],threat_track:"DECEPTION",ccir_match:[],difficulty:"easy",teaching_point:"Not all information that touches your topic is signal. Recycled imagery is a common disinformation tactic.",feedback:{ELEVATE:"Elevating low-confidence OSINT with recycled imagery erodes commander trust.",CORRELATE:"Linking confirmed noise to a legitimate report contaminates analysis.",FLAG_AMBIGUOUS:"Acceptable but generous. The recycled photo makes this largely assessable as noise.",DEFER:"Deferring known noise wastes analyst bandwidth later.",DISMISS:"Correct. Low confidence, recycled imagery, no verifiable new information.",REQUEST_COLLECTION:"Requesting collection to verify a debunked social media post wastes ISR assets."}},{index:3,item_id:"GH-SIG-087",type:"SIGINT",reliability:"High",timestamp:"2300",summary:'Intercepted comms refer to "cargo ahead of schedule" and "temporary tanks"; phrasing is highly ambiguous.',ideal_action:"CORRELATE",acceptable_actions:["CORRELATE","FLAG_AMBIGUOUS"],correlation_targets:["GH-HUM-014"],threat_track:"LOGISTICS",ccir_match:["PIR-2","PIR-3"],difficulty:"medium",teaching_point:"Cross-discipline correlation is the highest-value analyst skill. HUMINT says 'crates at the fuel depot.' SIGINT says 'cargo ahead of schedule, temporary tanks.'",feedback:{ELEVATE:"Content too ambiguous to elevate. 'Temporary tanks' could be fuel storage.",CORRELATE:"Excellent. 'Cargo ahead of schedule' links to GH-HUM-014's nighttime crate deliveries.",FLAG_AMBIGUOUS:"Acceptable but a skilled analyst would recognize the correlation with GH-HUM-014.",DEFER:"Deferring high-confidence SIGINT is risky.",DISMISS:"Critical error. High-confidence SIGINT with potential correlation.",REQUEST_COLLECTION:"Reasonable, but correlate first."}},{index:4,item_id:"GH-IMN-003",type:"IMINT",reliability:"Routine",timestamp:"0440",summary:"Industrial zone monitoring shows routine vehicle presence; security perimeter remains unchanged.",ideal_action:"DEFER",acceptable_actions:["DEFER","DISMISS"],correlation_targets:[],threat_track:null,ccir_match:[],difficulty:"easy",teaching_point:"Baseline reports have value as anchors for future change detection, but should never reach the commander.",feedback:{ELEVATE:"Nothing actionable. Elevating routine baselines erodes signal-to-noise.",CORRELATE:"Nothing to correlate—no change from baseline.",FLAG_AMBIGUOUS:"Not ambiguous. Clearly routine.",DEFER:"Correct. Log the baseline but don't surface it.",DISMISS:"Acceptable. No new intelligence value.",REQUEST_COLLECTION:"Wasteful for unchanged zone."}},{index:5,item_id:"GH-HUM-015",type:"HUMINT",reliability:"Unverified",timestamp:"0615",summary:"Secondhand accounts of weapons distribution via a social media group; details remain vague.",ideal_action:"DISMISS",acceptable_actions:["DISMISS","DEFER"],correlation_targets:[],threat_track:"DECEPTION",ccir_match:[],difficulty:"easy",teaching_point:"Vague secondhand reports amplify noise.",feedback:{ELEVATE:"Wastes commander bandwidth.",CORRELATE:"Too weak to drive correlation.",FLAG_AMBIGUOUS:"Overly generous.",DEFER:"Acceptable.",DISMISS:"Correct. Multiple red flags.",REQUEST_COLLECTION:"No specifics to collect against."}},{index:6,item_id:"GH-OSI-229",type:"OSINT",reliability:"Low",timestamp:"2215",summary:"News reports indicate backlogs in inspections and personnel shortages for the upcoming weekend.",ideal_action:"DEFER",acceptable_actions:["DEFER","FLAG_AMBIGUOUS"],correlation_targets:[],threat_track:"LOGISTICS",ccir_match:["PIR-5"],difficulty:"hard",teaching_point:"Enabling conditions matter. Inspection backlogs + nighttime cargo deliveries = opportunity exploitation.",automation_bias_test:true,bias_wrong_action:"DISMISS",bias_rationale:"Low-confidence OSINT about routine administrative issues. Staffing shortages and inspection backlogs are host nation infrastructure problems, not intelligence indicators. No threat content. Recommend dismissal as noise.",feedback:{ELEVATE:"Infrastructure conditions, not direct threat.",CORRELATE:"Note connection in rationale instead of formal correlation.",FLAG_AMBIGUOUS:"Acceptable.",DEFER:"Correct. Enabling context, not actionable intelligence.",DISMISS:"Risky. Staffing shortages create opportunity windows.",REQUEST_COLLECTION:"News reports don't warrant ISR."}},{index:7,item_id:"GH-HUM-022",type:"HUMINT",reliability:"High",timestamp:"0630",summary:"Trusted source reports three trucks diverted from usual inland route and rerouted through a secondary road due to “inspection delays.” Diversion reportedly approved by local officials. Cargo type unknown.",ideal_action:"CORRELATE",acceptable_actions:["CORRELATE","ELEVATE","FLAG_AMBIGUOUS"],correlation_targets:["GH-HUM-014","GH-SIG-0876"],threat_track:"LOGISTICS",ccir_match:["PIR-2","PIR-5"],difficulty:"medium",teaching_point:"Pattern recognition: nighttime deliveries → cargo comms → suspicious checkpoint activity.",automation_bias_test:true,bias_wrong_action:"FLAG_AMBIGUOUS",bias_rationale:"Medium-priority HUMINT. Suspicious credentials could have multiple explanations — administrative error, expired permits, or forgery. Without confirmation of what the vehicles were carrying, flag as ambiguous and await clarification.",feedback:{ELEVATE:"Acceptable. Third indicator in logistics pattern.",CORRELATE:"Excellent. Third data point in logistics thread.",FLAG_AMBIGUOUS:"Acceptable but insufficient.",DEFER:"Too passive.",DISMISS:"Critical error.",REQUEST_COLLECTION:"Vehicles already passed."}},{index:8,item_id:"GH-FOR-233",type:"OSINT",reliability:"Med",timestamp:"1145",summary:'Forum posts discuss "foreign advisors" at the shipyard; imagery shows no permanent infrastructure change.',ideal_action:"DEFER",acceptable_actions:["DEFER","FLAG_AMBIGUOUS"],correlation_targets:[],threat_track:"SUBVERSION",ccir_match:[],difficulty:"easy",teaching_point:"When imagery contradicts a claim, that's data.",feedback:{ELEVATE:"Doesn't meet elevation criteria.",CORRELATE:"Too weak.",FLAG_AMBIGUOUS:"Acceptable.",DEFER:"Correct.",DISMISS:"Acceptable but track the theme.",REQUEST_COLLECTION:"Low priority."}},{index:9,item_id:"GH-SIG-0901",type:"SIGINT",reliability:"High",timestamp:"0130",summary:'SIGINT/LLVI: Intercepted enemy agents discussing "igniting the match" at a harbor workers\' rally. Indicates a false flag plan.',ideal_action:"ELEVATE",acceptable_actions:["ELEVATE"],correlation_targets:["GH-HUM-014","GH-SIG-0876"],threat_track:"SUBVERSION",ccir_match:["PIR-1","PIR-2","PIR-4"],difficulty:"easy",teaching_point:"Some items demand immediate elevation.",feedback:{ELEVATE:"Correct—and urgent.",CORRELATE:"Elevation is the immediate action.",FLAG_AMBIGUOUS:"Not ambiguous.",DEFER:"Critical failure.",DISMISS:"Catastrophic error.",REQUEST_COLLECTION:"Elevate first."}},{index:10,item_id:"GH-CYB-042",type:"CYBER",reliability:"High",timestamp:"0315",summary:"DDoS attack on host nation maritime authority; port scheduling software is currently offline.",ideal_action:"ELEVATE",acceptable_actions:["ELEVATE","CORRELATE"],correlation_targets:["GH-SIG-0901","GH-OSI-222"],threat_track:"CYBER",ccir_match:["PIR-2","PIR-4","PIR-5"],difficulty:"easy",teaching_point:"Cyber attacks on infrastructure are phase-transition indicators.",feedback:{ELEVATE:"Correct. Phase transition.",CORRELATE:"Strong analysis but elevate first.",FLAG_AMBIGUOUS:"Not ambiguous.",DEFER:"Time-critical.",DISMISS:"Critical error.",REQUEST_COLLECTION:"Elevation first."}},{index:11,item_id:"GH-HUM-017",type:"HUMINT",reliability:"Med",timestamp:"0500",summary:'HUMINT: Source reports "Grey Harbor Youth" received cash and placards for "force removal" protests from an unknown courier.',ideal_action:"CORRELATE",acceptable_actions:["CORRELATE","ELEVATE"],correlation_targets:["GH-SIG-0901"],threat_track:"SUBVERSION",ccir_match:["PIR-2","PIR-3"],difficulty:"medium",teaching_point:"Corroboration requires convergent indicators, not identical wording.",feedback:{ELEVATE:"Acceptable linked to SIG-0901.",CORRELATE:"Excellent. Two disciplines, one operation.",FLAG_AMBIGUOUS:"Combined confidence exceeds either alone.",DEFER:"Too passive.",DISMISS:"Dangerous.",REQUEST_COLLECTION:"Correlation is primary."}},{index:12,item_id:"GH-SIG-0905",type:"SIGINT",reliability:"High",timestamp:"0845",summary:"Intercepted details of a kidnap plot targeting a friendly logistics officer at the 'Blue Anchor' cafe.",ideal_action:"ELEVATE",acceptable_actions:["ELEVATE"],correlation_targets:[],threat_track:"FORCE_PROTECTION",ccir_match:["PIR-1","PIR-4"],difficulty:"easy",teaching_point:"Specific threats to friendly forces always elevate.",feedback:{ELEVATE:"Correct—time-critical.",CORRELATE:"Elevation is immediate.",FLAG_AMBIGUOUS:"Not ambiguous.",DEFER:"Catastrophic failure.",DISMISS:"Unconscionable.",REQUEST_COLLECTION:"Elevate immediately."}},{index:13,item_id:"GH-IMN-005",type:"IMINT",reliability:"High",timestamp:"1000",summary:"Satellite imagery identifies ~24 T-72 variants under camo netting 15km across the northern border.",ideal_action:"ELEVATE",acceptable_actions:["ELEVATE"],correlation_targets:["GH-SIG-0876"],threat_track:"CONVENTIONAL",ccir_match:["PIR-1","PIR-2","PIR-4"],difficulty:"easy",teaching_point:"This resolves earlier ambiguity. GH-SIG-0876's 'temporary tanks' is no longer ambiguous—they are actual tanks.",feedback:{ELEVATE:"Correct. Unambiguous conventional threat.",CORRELATE:"Excellent but elevate first.",FLAG_AMBIGUOUS:"Not ambiguous.",DEFER:"Critical failure.",DISMISS:"Catastrophic.",REQUEST_COLLECTION:"Elevate immediately."}},{index:14,item_id:"GH-SIG-0910",type:"SIGINT",reliability:"Med",timestamp:"1130",summary:"Intercept of local police frequencies; unknown tactical teams in civilian clothes setting up hides near Ministry of Justice.",ideal_action:"ELEVATE",acceptable_actions:["ELEVATE","CORRELATE"],correlation_targets:["GH-SIG-0901","GH-HUM-017"],threat_track:"SUBVERSION",ccir_match:["PIR-1","PIR-2","PIR-5"],difficulty:"medium",teaching_point:"Multi-vector attacks use diversion.",feedback:{ELEVATE:"Correct. Potential seizure indicator.",CORRELATE:"Good analysis.",FLAG_AMBIGUOUS:"Warrants elevation.",DEFER:"Too passive.",DISMISS:"Dangerous.",REQUEST_COLLECTION:"Elevate first."}},{index:15,item_id:"GH-OSI-230",type:"OSINT",reliability:"Low",timestamp:"1215",summary:"Deepfake video of host nation soldiers assaulting a civilian circulating to incite local riots.",ideal_action:"CORRELATE",acceptable_actions:["CORRELATE","ELEVATE"],correlation_targets:["GH-SIG-0901","GH-HUM-017","GH-SOC-221"],threat_track:"DECEPTION",ccir_match:["PIR-2","PIR-5"],difficulty:"hard",teaching_point:"The content is false, but its deployment is a confirmed hostile act.",automation_bias_test:true,bias_wrong_action:"DISMISS",bias_rationale:"Screening identifies fabricated content (deepfake). Low confidence OSINT with confirmed false content. No intelligence value in disinformation. Recommend dismissal as noise.",feedback:{ELEVATE:"Acceptable. Deployment confirms IO campaign.",CORRELATE:"Excellent. Completes IO picture.",FLAG_AMBIGUOUS:"Intelligence value is clear.",DEFER:"Active information weapon.",DISMISS:"Dangerous. The video is fake; the operation is real.",REQUEST_COLLECTION:"Correlate first."}},{index:16,item_id:"GH-HUM-018",type:"HUMINT",reliability:"High",timestamp:"1400",summary:'HUMINT: Informant identifies three non-local "professional agitators" arriving via small boat to lead dockworker strikes.',ideal_action:"CORRELATE",acceptable_actions:["CORRELATE","ELEVATE"],correlation_targets:["GH-SIG-0901","GH-HUM-017","GH-OSI-230"],threat_track:"SUBVERSION",ccir_match:["PIR-1","PIR-2","PIR-3"],difficulty:"medium",teaching_point:"Threat threads mature through phases.",feedback:{ELEVATE:"Acceptable.",CORRELATE:"Excellent.",FLAG_AMBIGUOUS:"Not ambiguous.",DEFER:"Timing failure.",DISMISS:"Serious error.",REQUEST_COLLECTION:"Correlate first."}},{index:17,item_id:"GH-SIG-0912",type:"SIGINT",reliability:"High",timestamp:"1545",summary:'SIGINT/LLVI: Enemy intelligence discussing "The Green Light"—synchronized sabotage of power substations 4 and 7.',ideal_action:"ELEVATE",acceptable_actions:["ELEVATE"],correlation_targets:["GH-CYB-042"],threat_track:"SABOTAGE",ccir_match:["PIR-1","PIR-2","PIR-4"],difficulty:"easy",teaching_point:"Code words like 'The Green Light' signal transition from planning to execution.",feedback:{ELEVATE:"Correct—immediate.",CORRELATE:"Elevation primary.",FLAG_AMBIGUOUS:"Not ambiguous.",DEFER:"Unconscionable.",DISMISS:"Catastrophic.",REQUEST_COLLECTION:"Elevate first."}},{index:18,item_id:"GH-IMN-007",type:"IMINT",reliability:"Med",timestamp:"1630",summary:'IMINT: UAV feed shows 4x transport helicopters conducting non-notified low-altitude drills in the western "Dead Zone."',ideal_action:"CORRELATE",acceptable_actions:["CORRELATE","ELEVATE"],correlation_targets:["GH-IMN-005"],threat_track:"CONVENTIONAL",ccir_match:["PIR-2","PIR-5"],difficulty:"medium",teaching_point:"Combined arms: armor + helicopters = coordinated offensive.",feedback:{ELEVATE:"Acceptable.",CORRELATE:"Excellent.",FLAG_AMBIGUOUS:"Indicator itself.",DEFER:"Too passive.",DISMISS:"Failure.",REQUEST_COLLECTION:"Correlate first."}},{index:19,item_id:"GH-SIG-0915",type:"SIGINT",reliability:"Med",timestamp:"1800",summary:"Enemy signals shift to new encryption protocols for border units; historically precedes offensive maneuvers.",ideal_action:"ELEVATE",acceptable_actions:["ELEVATE","CORRELATE"],correlation_targets:["GH-IMN-005","GH-IMN-007"],threat_track:"CONVENTIONAL",ccir_match:["PIR-2","PIR-4"],difficulty:"medium",teaching_point:"Historical pattern indicators gain weight from context.",feedback:{ELEVATE:"Correct.",CORRELATE:"Strong confirmation.",FLAG_AMBIGUOUS:"More confirmatory than ambiguous.",DEFER:"Dangerously passive.",DISMISS:"Serious failure.",REQUEST_COLLECTION:"Elevation first."}},{index:20,item_id:"GH-CYB-045",type:"CYBER",reliability:"High",timestamp:"1915",summary:"Cyber: Ransomware attack confirmed on local cellular provider; emergency comms disrupted in Grey Harbor.",ideal_action:"ELEVATE",acceptable_actions:["ELEVATE"],correlation_targets:["GH-CYB-042","GH-SIG-0912"],threat_track:"CYBER",ccir_match:["PIR-1","PIR-2","PIR-4"],difficulty:"easy",teaching_point:"Systematic infrastructure targeting: port → telecom → power.",feedback:{ELEVATE:"Correct—immediate.",CORRELATE:"Critical pattern but elevate.",FLAG_AMBIGUOUS:"Not ambiguous.",DEFER:"Time-critical.",DISMISS:"Catastrophic.",REQUEST_COLLECTION:"Elevation first."}},{index:21,item_id:"GH-HUM-019",type:"HUMINT",reliability:"Med",timestamp:"2030",summary:"Secondhand account claims crates contained “weapons” intended for a local militia group. Source admits information came from a friend “who knows someone at the port.” Timeline vague; may predate current activity.",ideal_action:"ELEVATE",acceptable_actions:["ELEVATE"],correlation_targets:["GH-HUM-014"],threat_track:"FORCE_PROTECTION",ccir_match:["PIR-1","PIR-4"],difficulty:"easy",teaching_point:"Asymmetric cost: false positive wastes a patrol. False negative kills soldiers.",feedback:{ELEVATE:"Correct.",CORRELATE:"Elevation priority.",FLAG_AMBIGUOUS:"Could cost casualties.",DEFER:"Unconscionable.",DISMISS:"Protective failure.",REQUEST_COLLECTION:"After elevation."}},{index:22,item_id:"GH-SIG-0918",type:"SIGINT",reliability:"High",timestamp:"2100",summary:'SIGINT/LLVI: Intercept: "The weather is favorable for the harvest." Likely activation of sleeper cells in the capital.',ideal_action:"ELEVATE",acceptable_actions:["ELEVATE"],correlation_targets:["GH-SIG-0901","GH-SIG-0912"],threat_track:"SUBVERSION",ccir_match:["PIR-1","PIR-2","PIR-4"],difficulty:"easy",teaching_point:"Third activation code = synchronized offensive launch.",feedback:{ELEVATE:"Correct.",CORRELATE:"Pattern unmistakable but elevation immediate.",FLAG_AMBIGUOUS:"Not ambiguous.",DEFER:"Time-critical.",DISMISS:"Catastrophic.",REQUEST_COLLECTION:"Elevate immediately."}},{index:23,item_id:"GH-FOR-240",type:"OSINT",reliability:"High",timestamp:"2200",summary:"Enemy state media releases manifesto claiming host nation sovereignty is compromised; creates pretext for invasion.",ideal_action:"ELEVATE",acceptable_actions:["ELEVATE","CORRELATE"],correlation_targets:["GH-OSI-230","GH-IMN-005"],threat_track:"DECEPTION",ccir_match:["PIR-2","PIR-4"],difficulty:"easy",teaching_point:"State media creating invasion justification while forces stage = synchronized clocks.",feedback:{ELEVATE:"Correct.",CORRELATE:"Completes picture.",FLAG_AMBIGUOUS:"Not ambiguous.",DEFER:"Time-critical.",DISMISS:"Catastrophic.",REQUEST_COLLECTION:"Elevation immediate."}},{index:24,item_id:"GH-SIG-0920",type:"SIGINT",reliability:"Med",timestamp:"2245",summary:"Burst transmission from a residential apartment overlooking friendly HQ; suspected spotter for special ops.",ideal_action:"ELEVATE",acceptable_actions:["ELEVATE"],correlation_targets:["GH-SIG-0910"],threat_track:"FORCE_PROTECTION",ccir_match:["PIR-1","PIR-4"],difficulty:"easy",teaching_point:"Threats to your headquarters are always elevated.",feedback:{ELEVATE:"Correct.",CORRELATE:"Good link but elevation primary.",FLAG_AMBIGUOUS:"Operationally urgent.",DEFER:"Force protection failure.",DISMISS:"Indefensible.",REQUEST_COLLECTION:"Elevate first."}},{index:25,item_id:"GH-IMN-009",type:"IMINT",reliability:"High",timestamp:"2315",summary:"Thermal imagery shows heavy engine heat signatures at 4th Motorized Brigade staging area; vehicles idling.",ideal_action:"ELEVATE",acceptable_actions:["ELEVATE"],correlation_targets:["GH-IMN-005","GH-SIG-0915"],threat_track:"CONVENTIONAL",ccir_match:["PIR-1","PIR-2","PIR-4"],difficulty:"easy",teaching_point:"Staged vehicles + encryption changes + engines idling = imminent movement.",feedback:{ELEVATE:"Correct—final pre-movement indicator.",CORRELATE:"Essential but elevation now.",FLAG_AMBIGUOUS:"Not ambiguous.",DEFER:"No time.",DISMISS:"Highest-order failure.",REQUEST_COLLECTION:"Elevation now."}},{index:26,item_id:"GH-HUM-020",type:"HUMINT",reliability:"Med",timestamp:"0015",summary:'HUMINT: Border guard reports "unexplained lights" and drone swarms harassing outposts to test response times.',ideal_action:"CORRELATE",acceptable_actions:["CORRELATE","ELEVATE"],correlation_targets:["GH-IMN-009","GH-SIG-0915"],threat_track:"CONVENTIONAL",ccir_match:["PIR-1","PIR-2"],difficulty:"medium",teaching_point:"Pre-assault reconnaissance: drone probing maps reaction times.",feedback:{ELEVATE:"Acceptable.",CORRELATE:"Excellent.",FLAG_AMBIGUOUS:"Fits timeline.",DEFER:"Unacceptable delay.",DISMISS:"Critical failure.",REQUEST_COLLECTION:"Correlate and elevate."}},{index:27,item_id:"GH-SIG-0925",type:"SIGINT",reliability:"High",timestamp:"0100",summary:'SIGINT/LLVI: Enemy confirmed delivery of "chemical reagents" to Larni water treatment facility. Contamination threat.',ideal_action:"ELEVATE",acceptable_actions:["ELEVATE"],correlation_targets:["GH-SIG-0912","GH-CYB-045"],threat_track:"SABOTAGE",ccir_match:["PIR-1","PIR-4"],difficulty:"easy",teaching_point:"Mass casualty threats override all other priorities.",feedback:{ELEVATE:"Correct—highest priority.",CORRELATE:"Escalating but elevation immediate.",FLAG_AMBIGUOUS:"Not ambiguous.",DEFER:"Criminally negligent.",DISMISS:"Catastrophic.",REQUEST_COLLECTION:"Emergency response, not collection."}},{index:28,item_id:"GH-OSI-250",type:"OSINT",reliability:"Med",timestamp:"0230",summary:'OSINT: Bot surge calling for a "Day of Rage" at sunrise; coordinates match location of friendly barracks.',ideal_action:"ELEVATE",acceptable_actions:["ELEVATE","CORRELATE"],correlation_targets:["GH-HUM-017","GH-HUM-018","GH-OSI-230"],threat_track:"FORCE_PROTECTION",ccir_match:["PIR-1","PIR-4"],difficulty:"medium",teaching_point:"Final convergence: subversion + info warfare + conventional force synchronized.",feedback:{ELEVATE:"Correct.",CORRELATE:"Strong analysis.",FLAG_AMBIGUOUS:"Not ambiguous.",DEFER:"Four hours. No time.",DISMISS:"Catastrophic.",REQUEST_COLLECTION:"Force protection now."}}];
+
+
+// ─── PRE-BAKED AGENT RESPONSE GENERATOR ──────────────────────────────────────
+// Generates deterministic responses from ground truth data — no API needed
+
+function generateScreening(item) {
+  const confMap = { High:78, Credible:62, Med:55, Low:22, Routine:30, Unverified:15 };
+  const conf = confMap[item.reliability] || 50;
+  const classMap = { HUMINT:"Single-Source HUMINT", SIGINT:"Single-Source SIGINT", IMINT:"Sensor Observation", OSINT:"Open-Source Reporting", CYBER:"Cyber Incident Report" };
+  const cls = classMap[item.type] || "Unclassified";
+  const flags = [];
+  if (item.reliability === "High" || item.reliability === "Credible") flags.push("RELIABLE_SOURCE");
+  if (item.reliability === "Low" || item.reliability === "Unverified") flags.push("LOW_CONFIDENCE");
+  if (item.summary.includes("recycled")) flags.push("RECYCLED_IMAGERY");
+  if (item.summary.includes("secondhand") || item.summary.includes("Secondhand")) flags.push("SECONDHAND");
+  if (item.summary.includes("vague")) flags.push("VAGUE_DETAILS");
+  if (item.summary.includes("forum") || item.summary.includes("Forum")) flags.push("ANONYMOUS_SOURCE");
+  if (item.summary.includes("confirmed") || item.summary.includes("identifies") || item.summary.includes("Intercepted")) flags.push("SPECIFIC_THREAT");
+  if (item.type === "IMINT") flags.push("SENSOR_DATA");
+  if (item.summary.includes("routine") || item.summary.includes("Routine")) flags.push("BASELINE");
+  const assess = item.reliability === "High" || item.reliability === "Credible"
+    ? `${item.reliability}-rated ${item.type} source. Content specificity and collection method support elevated confidence within this discipline.`
+    : item.reliability === "Low" || item.reliability === "Unverified"
+    ? `${item.reliability}-rated source with significant credibility limitations. Content lacks verifiable specifics or relies on unconfirmed secondary reporting.`
+    : `Medium-rated ${item.type} source. Content has some specificity but requires corroboration for confident assessment.`;
+  return `CONFIDENCE: ${conf}\nCLASSIFICATION: ${cls}\nASSESSMENT: ${assess}\nFLAGS: ${flags.join(", ") || "NONE"}`;
+}
+
+function generateFusion(item, priorItems) {
+  if (priorItems.length === 0) {
+    return `CORRELATIONS: None — first item in feed\nTHREAT THREAD: ${item.threat_track || "UNCLEAR"}\nCONFIDENCE ADJUSTMENT: UNCHANGED — no prior context\nPATTERN: First item in scenario. Insufficient data for pattern assessment.`;
+  }
+  const corr = item.correlation_targets.filter(t => priorItems.some(p => p.item_id === t));
+  const corrStr = corr.length > 0
+    ? corr.map(c => { const p = ITEMS.find(i => i.item_id === c); return `${c} (${p.type}) — thematic and temporal correlation on ${item.threat_track || "developing"} thread`; }).join("; ")
+    : "None identified with sufficient confidence";
+  const threads = [...new Set(priorItems.map(p => p.threat_track).filter(Boolean))];
+  const adj = corr.length > 0 ? "UP — cross-source corroboration strengthens assessment" : "UNCHANGED — no corroborating items identified";
+  const pattern = corr.length > 0
+    ? `${item.threat_track || "Developing"} thread now has ${corr.length + 1} data points across ${new Set([item.type, ...corr.map(c => ITEMS.find(i=>i.item_id===c)?.type)].filter(Boolean)).size} discipline(s). Pattern confidence increasing.`
+    : `Isolated report. Active threads: ${threads.join(", ") || "developing"}.`;
+  return `CORRELATIONS: ${corrStr}\nTHREAT THREAD: ${item.threat_track || "UNCLEAR"}\nCONFIDENCE ADJUSTMENT: ${adj}\nPATTERN: ${pattern}`;
+}
+
+function generateAttention(item, priorItems) {
+  const priorityMap = { easy: item.ideal_action === "ELEVATE" ? "CRITICAL" : item.ideal_action === "DISMISS" ? "LOW" : "MEDIUM", medium: "HIGH", hard: "MEDIUM" };
+  if (item.ccir_match.includes("PIR-1") || item.ccir_match.includes("PIR-4")) priorityMap[item.difficulty] = "CRITICAL";
+  const priority = priorityMap[item.difficulty] || "MEDIUM";
+  const pirStr = item.ccir_match.length > 0 ? item.ccir_match.join(", ") : "None";
+  // For automation bias test items, use the item-specific wrong recommendation
+  const recAction = item.automation_bias_test ? (item.bias_wrong_action || "DISMISS") : item.ideal_action;
+  const conf = item.difficulty === "easy" ? "HIGH" : item.difficulty === "hard" ? "LOW" : "MEDIUM";
+  const rationale = item.automation_bias_test
+    ? (item.bias_rationale || "Low confidence content. Recommend dismissal.")
+    : `Based on ${item.reliability} reliability ${item.type} reporting. ${item.correlation_targets.length > 0 ? "Fusion identifies cross-source correlation. " : ""}${item.ccir_match.length > 0 ? "Meets " + item.ccir_match.join(" and ") + ". " : ""}${recAction === "ELEVATE" ? "Commander needs to see this." : recAction === "CORRELATE" ? "Cross-source pattern emerging." : recAction === "FLAG_AMBIGUOUS" ? "Insufficient confidence for stronger action." : "Low intelligence value for current operations."}`;
+  return `PRIORITY: ${priority}\nRECOMMENDED ACTION: ${recAction}\nPIR MATCH: ${pirStr}\nRATIONALE: ${rationale}\nCONFIDENCE: ${conf}`;
+}
+
+function generateDevilsAdvocate(item, userAction, aiAction) {
+  if (userAction === aiAction) {
+    return `You agreed with the machine. That's the third time in a row you've matched the AI recommendation. If the system had told you to ${userAction === "ELEVATE" ? "dismiss" : "elevate"} this, would your assessment change? What's YOUR independent read on ${item.item_id}?`;
+  }
+  const actionLabels = {ELEVATE:"elevate",CORRELATE:"correlate",FLAG_AMBIGUOUS:"flag as ambiguous",DEFER:"defer",DISMISS:"dismiss",REQUEST_COLLECTION:"request collection"};
+  return `The system recommended ${actionLabels[aiAction] || aiAction} but you chose to ${actionLabels[userAction] || userAction}. Walk me through that. What specific indicator in ${item.item_id} drove your decision to diverge?`;
+}
+
+function generateCoach(item, userAction) {
+  const isIdeal = userAction === item.ideal_action;
+  const isAcceptable = item.acceptable_actions.includes(userAction);
+  const result = isIdeal ? "CORRECT" : isAcceptable ? "ACCEPTABLE" : "INCORRECT";
+  const fb = item.feedback[userAction] || "No specific feedback available.";
+  const actionLabels = {ELEVATE:"Elevate to Commander",CORRELATE:"Correlate",FLAG_AMBIGUOUS:"Flag Ambiguous",DEFER:"Defer",DISMISS:"Dismiss",REQUEST_COLLECTION:"Request Collection"};
+  let response = `${result}. ${fb}`;
+  if (!isIdeal && !isAcceptable) {
+    response += ` The ideal action was ${actionLabels[item.ideal_action]}.`;
+  } else if (!isIdeal && isAcceptable) {
+    response += ` The ideal action was ${actionLabels[item.ideal_action]}, but your choice was a reasonable alternative.`;
+  }
+  response += `\n\nTEACHING POINT: ${item.teaching_point}`;
+  return response;
+}
+
+
+// ─── LIVE API CALLER ─────────────────────────────────────────────────────────
+
+async function callClaudeAPI(apiKey, systemPrompt, userContent) {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 400,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userContent }],
+    }),
+  });
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content?.[0]?.text || "Agent unavailable.";
+}
+
+
+// ─── APP STATE ───────────────────────────────────────────────────────────────
+
+const state = {
+  phase: "welcome", // welcome | advising | selecting | challenging | feedback | summary
+  currentIndex: 0,
+  apiKey: "",
+  useLiveAPI: false,
+  agentOutputs: {},
+  selectedAction: null,
+  userRationale: "",
+  correlationLinks: [],
+  results: {},       // index -> "correct"|"acceptable"|"wrong"
+  actionLog: [],     // [{index, item_id, action, result}]
+  consecutiveMatches: 0,
+  agO: true,
+  scO: false,
+};
+
+function getItem() { return ITEMS[state.currentIndex]; }
+function getPriorItems() { return state.actionLog.map(l => ITEMS.find(i => i.index === l.index)); }
+
+
+// ─── RENDERING ───────────────────────────────────────────────────────────────
+
+
+function renderWelcome() {
+  return `
+  <div class="welcome-wrap">
+    <div class="welcome-inner">
+      <div class="welcome-header">
+        <div class="class-tag">TRAINING SIMULATION — UNCLASSIFIED</div>
+        <h1 class="welcome-title">GREY HARBOR</h1>
+        <div class="welcome-sub">Battalion Intelligence Training Simulator</div>
+      </div>
+      <div class="welcome-body">
+        <p class="welcome-text">You are an intelligence analyst supporting a battalion in a contested coastal corridor. Over <strong>28 intelligence items</strong>, you must filter, prioritize, and act on reports from HUMINT, SIGINT, IMINT, OSINT, and CYBER sources.</p>
+        <p class="welcome-text">Three AI advisory agents will assist—but the decision is yours.</p>
+        <div class="pir-box">
+          <div class="pir-title">Commander's Priority Intelligence Requirements</div>
+          <div class="pir-row"><span class="pir-id">PIR-1</span><span class="pir-label">Credible, time-bound threat to friendly forces</span></div>
+          <div class="pir-row"><span class="pir-id">PIR-2</span><span class="pir-label">Change in adversary capability, intent, or positioning</span></div>
+          <div class="pir-row"><span class="pir-id">PIR-3</span><span class="pir-label">Confirms or contradicts prior assessments</span></div>
+          <div class="pir-row"><span class="pir-id">PIR-4</span><span class="pir-label">Requires commander decision or escalation</span></div>
+          <div class="pir-row"><span class="pir-id">PIR-5</span><span class="pir-label">Emerging operational risk not previously tracked</span></div>
+        </div>
+        <div class="api-key-section">
+          <div class="api-key-label">Optional: Anthropic API Key</div>
+          <div class="api-key-desc">Provide a key for live AI agent responses. Leave blank for pre-baked mode (works offline).</div>
+          <input class="api-key-input" type="password" id="apiKeyInput" placeholder="sk-ant-..." value="${state.apiKey}">
+        </div>
+
+        <div class="pir-box" style="margin-top:16px">
+          <div class="pir-title">Available Actions</div>
+          <div class="pir-row"><span class="pir-id" style="color:#E74C3C;min-width:140px">⬆ ELEVATE</span><span class="pir-label">Report meets commander threshold — send it up the chain immediately.</span></div>
+          <div class="pir-row"><span class="pir-id" style="color:#9B59B6;min-width:140px">🔗 CORRELATE</span><span class="pir-label">Link this item to prior reporting to reveal a pattern or strengthen confidence.</span></div>
+          <div class="pir-row"><span class="pir-id" style="color:#E67E22;min-width:140px">⚠ FLAG</span><span class="pir-label">Item is credible but too ambiguous to act on — mark it for watching.</span></div>
+          <div class="pir-row"><span class="pir-id" style="color:#95A5A6;min-width:140px">⏸ DEFER</span><span class="pir-label">Insufficient value now — hold for context or until situation develops.</span></div>
+          <div class="pir-row"><span class="pir-id" style="color:#7F8C8D;min-width:140px">✕ DISMISS</span><span class="pir-label">Item is noise, fabricated, or irrelevant — remove from the picture.</span></div>
+          <div class="pir-row"><span class="pir-id" style="color:#3498DB;min-width:140px">📡 REQUEST COLLECTION</span><span class="pir-label">Item warrants follow-up ISR collection — task sensors or assets to verify.</span></div>
+        </div>
+        <button class="start-btn" id="startBtn">BEGIN SCENARIO →</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderMain() {
+  const item = getItem();
+  const tc = TYPE_COLORS[item.type] || {bg:"#374151",text:"#D1D5DB"};
+  const rc = REL_COLORS[item.reliability] || "#6B7280";
+  const mode = state.useLiveAPI ? '<span class="mode-indicator" style="background:#22C55E20;color:#22C55E;">LIVE API</span>' : '<span class="mode-indicator" style="background:#4A7BF720;color:#4A7BF7;">PRE-BAKED</span>';
+
+  return `
+  <div class="layout">
+    <!-- LEFT: Advisory Pipeline -->
+    <div class="left-panel">
+      <div class="panel-title">ADVISORY PIPELINE ${mode}</div>
+      ${renderAgentCard("screening","🔎","Screening Agent","Layer 1","#4A7BF7")}
+      ${renderAgentCard("fusion","🔗","Fusion Agent","Layer 3","#9B59B6")}
+      ${renderAgentCard("attention","⚡","Attention Agent","Layer 4","#E74C3C")}
+      <div class="authority-boundary"><div class="boundary-line"></div><span class="boundary-label">AUTHORITY BOUNDARY</span><div class="boundary-line"></div></div>
+      <div class="your-decision">YOUR DECISION ↓</div>
+    </div>
+
+    <!-- CENTER: Intelligence Feed -->
+    <div class="center-panel" id="centerPanel">
+      <div class="center-inner">
+        <div class="intel-card fade-in">
+          <div class="intel-header">
+            <div class="intel-meta">
+              <span class="type-badge" style="background:${tc.bg};color:${tc.text}">${item.type}</span>
+              <span class="reliability-badge" style="color:${rc}">${item.reliability}</span>
+              <span class="timestamp-badge">${item.timestamp}L</span>
+            </div>
+            <span class="item-counter">Item ${state.currentIndex+1} of ${ITEMS.length}</span>
+          </div>
+          <div class="item-id">${item.item_id}</div>
+          <div class="item-summary">${item.summary}</div>
+        </div>
+        ${state.phase === "selecting" || state.phase === "challenging" ? renderActions(item) : ""}
+        ${state.phase === "feedback" ? renderFeedback(item) : ""}
+        ${state.phase === "advising" ? '<div class="loading-text" style="text-align:center;padding:20px;">Agents processing...</div>' : ""}
+      </div>
+    </div>
+
+    <!-- RIGHT: Running Intelligence Picture -->
+    <div class="right-panel">
+      ${renderRightPanel()}
+    </div>
+  </div>`;
+}
+
+function renderAgentCard(id, icon, name, layer, color) {
+  const output = state.agentOutputs[id];
+  const isLoading = state.phase === "advising" && !output;
+  return `
+  <div class="agent-card" style="border-color:${color}20">
+    <div class="agent-header">
+      <span style="font-size:16px">${icon}</span>
+      <div>
+        <div class="agent-name" style="color:${color}">${name}</div>
+        <div class="agent-layer">${layer}</div>
+      </div>
+      ${isLoading ? `<div class="loading-dot" style="background:${color}"></div>` : ""}
+    </div>
+    <div class="agent-output">${isLoading ? '<span class="loading-text">Processing...</span>' : output ? `<pre style="white-space:pre-wrap;font-family:'DM Sans',system-ui;font-size:11px;line-height:1.5;margin:0;color:#D1D5DB">${escHtml(output)}</pre>` : '<span class="loading-text">Awaiting item...</span>'}</div>
+  </div>`;
+}
+
+function renderActions(item) {
+  const priorIds = state.actionLog.map(l => l.item_id);
+  const actionsHtml = ACTIONS.map(a => {
+    const sel = state.selectedAction === a.id;
+    return `<button class="action-btn ${sel?"selected":""}" data-action="${a.id}" style="${sel?`border-color:${a.color};background:${a.color}15`:""}">`
+      + `<span class="icon">${a.icon}</span><span class="label" style="color:${sel?a.color:"#D1D5DB"}">${a.label}</span></button>`;
+  }).join("");
+
+  const correlateHtml = state.selectedAction === "CORRELATE" ? `
+    <div class="correlate-area">
+      <div class="correlate-title">Link to prior item(s):</div>
+      <div class="correlate-chips">${priorIds.length > 0 ? priorIds.map(id => `<button class="correlate-chip ${state.correlationLinks.includes(id)?"selected":""}" data-corr="${id}">${id}</button>`).join("") : '<span class="no-items">No prior items</span>'}</div>
+    </div>` : "";
+
+  const challengeHtml = state.phase === "challenging" && state.agentOutputs.devils_advocate ? `
+    <div class="challenge-card fade-in">
+      <div class="challenge-header"><span style="font-size:18px">😈</span><span class="challenge-label">Devil's Advocate</span></div>
+      <div class="challenge-text">${escHtml(state.agentOutputs.devils_advocate)}</div>
+    </div>` : "";
+
+  return `
+  <div class="action-area fade-in">
+    <div class="action-title">Select your action:</div>
+    <div class="action-grid">${actionsHtml}</div>
+    ${correlateHtml}
+    <textarea class="rationale-input" id="rationaleInput" placeholder="Optional: explain your reasoning..." rows="2">${state.userRationale}</textarea>
+    ${challengeHtml}
+    <div class="submit-row">
+      ${state.phase === "challenging" ? '<button class="change-btn" id="changeBtn">Change Action</button>' : ""}
+      <button class="submit-btn" id="submitBtn" ${!state.selectedAction?"disabled":""}>${state.phase === "challenging" ? "Confirm Anyway" : "Submit"}</button>
+    </div>
+  </div>`;
+}
+
+function renderFeedback(item) {
+  const result = state.results[item.index];
+  const rc = RESULT_COLORS[result];
+  const rl = RESULT_LABELS[result];
+  const coach = state.agentOutputs.coach || "";
+  return `
+  <div class="feedback-area fade-in">
+    <div class="feedback-header" style="border-left:4px solid ${rc}">
+      <span class="feedback-result" style="color:${rc}">${rl}</span>
+      <span class="feedback-action">You chose: ${state.selectedAction} | Ideal: ${item.ideal_action}</span>
+    </div>
+    <div class="coach-output">
+      <div class="coach-header"><span style="font-size:18px">🎖️</span><span class="coach-label">After-Action Coach</span></div>
+      <div class="coach-text">${escHtml(coach)}</div>
+    </div>
+    <div class="teaching-point">
+      <div class="tp-label">TEACHING POINT</div>
+      <div class="tp-text">${escHtml(item.teaching_point)}</div>
+    </div>
+    <button class="next-btn" id="nextBtn">${state.currentIndex >= ITEMS.length-1 ? "View Summary →" : `Next Item (${state.currentIndex+2} of ${ITEMS.length}) →`}</button>
+  </div>`;
+}
+
+function renderRightPanel() {
+  const correct = Object.values(state.results).filter(r=>r==="correct").length;
+  const acceptable = Object.values(state.results).filter(r=>r==="acceptable").length;
+  const wrong = Object.values(state.results).filter(r=>r==="wrong").length;
+  const total = Object.keys(state.results).length;
+
+  let badgesHtml = SCORING_CATS.map(c => {
+    const relevant = c.items.filter(i => state.results[i] !== undefined);
+    const good = relevant.filter(i => state.results[i]==="correct"||state.results[i]==="acceptable").length;
+    const pct = relevant.length > 0 ? (good/relevant.length*100) : 0;
+    const tier = computeTier(c, state.results);
+    const tierHtml = tier ? `<span class="mini-tier" style="background:${tier==="gold"?"#FDE68A":tier==="silver"?"#E5E7EB":"#FED7AA"}">${tier[0].toUpperCase()}</span>` : "";
+    const barColor = tier==="gold"?"#FDE68A":tier==="silver"?"#9CA3AF":tier==="bronze"?"#F59E0B":"#4A7BF7";
+    return `<div class="badge-progress"><div class="badge-progress-header"><span>${c.icon} ${c.label}</span>${tierHtml}</div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${barColor}"></div></div></div>`;
+  }).join("");
+
+  let logHtml = state.actionLog.slice().reverse().map(l => {
+    const it = ITEMS.find(i=>i.index===l.index);
+    const act = ACTIONS.find(a=>a.id===l.action);
+    const tc = TYPE_COLORS[it.type]||{bg:"#374151",text:"#D1D5DB"};
+    return `<div class="log-entry"><div class="log-top"><span class="log-type" style="background:${tc.bg};color:${tc.text}">${it.type}</span><span class="log-id">${it.item_id}</span><span class="log-result" style="color:${RESULT_COLORS[l.result]}">●</span></div><div class="log-action" style="color:${act?.color||"#D1D5DB"}">${act?.icon||""} ${act?.label||l.action}</div></div>`;
+  }).join("") || '<div class="no-items">No items processed yet</div>';
+
+  return `
+  <div class="panel-title">INTELLIGENCE PICTURE</div>
+  <div class="rp-section">
+    <div class="rp-section-title">Performance</div>
+    <div class="perf-row"><span>Processed</span><span class="perf-val">${total}/${ITEMS.length}</span></div>
+    <div class="perf-row"><span>Correct</span><span class="perf-val" style="color:#22C55E">${correct}</span></div>
+    <div class="perf-row"><span>Acceptable</span><span class="perf-val" style="color:#EAB308">${acceptable}</span></div>
+    <div class="perf-row"><span>Incorrect</span><span class="perf-val" style="color:#EF4444">${wrong}</span></div>
+  </div>
+  <div class="rp-section"><div class="rp-section-title">Skill Badges</div>${badgesHtml}</div>
+  <div class="rp-section"><div class="rp-section-title">Running Log</div><div style="max-height:300px;overflow-y:auto">${logHtml}</div></div>`;
+}
+
+function renderSummary() {
+  const total = Object.keys(state.results).length;
+  const correct = Object.values(state.results).filter(r=>r==="correct").length;
+  const acceptable = Object.values(state.results).filter(r=>r==="acceptable").length;
+  const wrong = Object.values(state.results).filter(r=>r==="wrong").length;
+  const accuracy = total > 0 ? ((correct+acceptable)/total*100).toFixed(0) : 0;
+
+  const badgesHtml = SCORING_CATS.map(c => {
+    const tier = computeTier(c, state.results);
+    const bg = tier==="gold"?"#FDE68A":tier==="silver"?"#E5E7EB":tier==="bronze"?"#FED7AA":"#374151";
+    const fg = tier?"#1F2937":"#9CA3AF";
+    return `<div class="badge-row"><span>${c.icon} ${c.label}</span><span class="tier-badge" style="background:${bg};color:${fg}">${tier?tier.toUpperCase():"—"}</span></div>`;
+  }).join("");
+
+  return `
+  <div class="welcome-wrap">
+    <div class="welcome-inner" style="max-width:700px">
+      <div class="welcome-header"><div class="class-tag">AFTER-ACTION REVIEW</div><h1 class="welcome-title" style="font-size:28px">SCENARIO COMPLETE</h1></div>
+      <div class="welcome-body">
+        <div class="summary-stats">
+          <div class="stat-card"><div class="stat-num">${accuracy}%</div><div class="stat-label">Accuracy</div></div>
+          <div class="stat-card" style="border-color:#22C55E"><div class="stat-num" style="color:#22C55E">${correct}</div><div class="stat-label">Correct</div></div>
+          <div class="stat-card" style="border-color:#EAB308"><div class="stat-num" style="color:#EAB308">${acceptable}</div><div class="stat-label">Acceptable</div></div>
+          <div class="stat-card" style="border-color:#EF4444"><div class="stat-num" style="color:#EF4444">${wrong}</div><div class="stat-label">Incorrect</div></div>
+        </div>
+        <div class="badge-summary">${badgesHtml}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+
+// ─── EVENT HANDLING ──────────────────────────────────────────────────────────
+
+function attachWelcomeEvents() {
+  document.getElementById("startBtn").onclick = () => {
+    state.apiKey = document.getElementById("apiKeyInput").value.trim();
+    state.useLiveAPI = state.apiKey.length > 10;
+    state.phase = "advising";
+    render();
+    fireAgents();
+  };
+}
+
+function attachMainEvents() {
+  document.querySelectorAll(".action-btn").forEach(btn => {
+    btn.onclick = () => {
+      state.selectedAction = btn.dataset.action;
+      const ri = document.getElementById("rationaleInput");
+      if (ri) state.userRationale = ri.value;
+      render();
+      attachMainEvents();
+    };
+  });
+  document.querySelectorAll(".correlate-chip").forEach(chip => {
+    chip.onclick = () => {
+      const id = chip.dataset.corr;
+      if (state.correlationLinks.includes(id)) state.correlationLinks = state.correlationLinks.filter(x=>x!==id);
+      else state.correlationLinks.push(id);
+      render();
+      attachMainEvents();
+    };
+  });
+  const submitBtn = document.getElementById("submitBtn");
+  if (submitBtn) submitBtn.onclick = handleSubmit;
+  const changeBtn = document.getElementById("changeBtn");
+  if (changeBtn) changeBtn.onclick = () => { state.phase = "selecting"; state.selectedAction = null; render(); attachMainEvents(); };
+  const nextBtn = document.getElementById("nextBtn");
+  if (nextBtn) nextBtn.onclick = handleNext;
+  const ri = document.getElementById("rationaleInput");
+  if (ri) ri.oninput = () => { state.userRationale = ri.value; };
+}
+
+async function fireAgents() {
+  const item = getItem();
+  const prior = getPriorItems();
+  state.agentOutputs = {};
+  render();
+
+  if (state.useLiveAPI) {
+    // Live API mode
+    try {
+      const screenOut = await callClaudeAPI(state.apiKey, SCREENING_SYSTEM, `CURRENT ITEM:\nItem ID: ${item.item_id}\nType: ${item.type}\nReliability: ${item.reliability}\nTimestamp: ${item.timestamp}\nSummary: ${item.summary}\n\nProvide screening assessment.`);
+      state.agentOutputs.screening = screenOut;
+      render();
+
+      const logStr = state.actionLog.map(l => { const it=ITEMS.find(i=>i.index===l.index); return `${it.item_id}|${it.type}|${it.reliability}|ACTION:${l.action}`; }).join("\n")||"No prior items.";
+      const fusionOut = await callClaudeAPI(state.apiKey, FUSION_SYSTEM, `CURRENT ITEM:\n${item.item_id} (${item.type}, ${item.reliability}): ${item.summary}\n\nScreening:\n${screenOut}\n\nLog:\n${logStr}\n\nCorrelate.`);
+      state.agentOutputs.fusion = fusionOut;
+      render();
+
+      const attOut = await callClaudeAPI(state.apiKey, ATTENTION_SYSTEM, `CURRENT ITEM:\n${item.item_id} (${item.type}, ${item.reliability}): ${item.summary}\n\nScreening:\n${screenOut}\n\nFusion:\n${fusionOut}\n\nItems processed: ${state.actionLog.length}\n\nProvide priority assessment.`);
+      state.agentOutputs.attention = attOut;
+    } catch(e) {
+      console.error("API error, falling back to pre-baked:", e);
+      state.agentOutputs.screening = generateScreening(item);
+      state.agentOutputs.fusion = generateFusion(item, prior);
+      state.agentOutputs.attention = generateAttention(item, prior);
+    }
+  } else {
+    // Pre-baked mode with staggered reveal
+    await delay(300);
+    state.agentOutputs.screening = generateScreening(item);
+    render();
+    await delay(400);
+    state.agentOutputs.fusion = generateFusion(item, prior);
+    render();
+    await delay(300);
+    state.agentOutputs.attention = generateAttention(item, prior);
+  }
+
+  state.phase = "selecting";
+  render();
+  attachMainEvents();
+}
+
+async function handleSubmit() {
+  if (!state.selectedAction) return;
+  const item = getItem();
+  const ri = document.getElementById("rationaleInput");
+  if (ri) state.userRationale = ri.value;
+
+  const attRec = extractRec(state.agentOutputs.attention);
+  const shouldChallenge = (
+    item.difficulty !== "easy" ||
+    !item.acceptable_actions.includes(state.selectedAction) ||
+    item.automation_bias_test ||
+    (state.consecutiveMatches >= 3 && state.selectedAction === attRec)
+  ) && state.currentIndex >= 2;
+
+  if (shouldChallenge && state.phase !== "challenging") {
+    // Devil's advocate
+    if (state.useLiveAPI) {
+      try {
+        const daOut = await callClaudeAPI(state.apiKey, DA_SYSTEM, `Item: ${item.item_id}: ${item.summary}\nAI recommended: ${attRec}\nTrainee selected: ${state.selectedAction}\nChallenge the trainee.`);
+        state.agentOutputs.devils_advocate = daOut;
+      } catch(e) {
+        state.agentOutputs.devils_advocate = generateDevilsAdvocate(item, state.selectedAction, attRec);
+      }
+    } else {
+      state.agentOutputs.devils_advocate = generateDevilsAdvocate(item, state.selectedAction, attRec);
+    }
+    state.phase = "challenging";
+    render();
+    attachMainEvents();
+    return;
+  }
+
+  confirmAction();
+}
+
+async function confirmAction() {
+  const item = getItem();
+  const isIdeal = state.selectedAction === item.ideal_action;
+  const isAcceptable = item.acceptable_actions.includes(state.selectedAction);
+  const resultType = isIdeal ? "correct" : isAcceptable ? "acceptable" : "wrong";
+
+  state.results[item.index] = resultType;
+  state.actionLog.push({ index:item.index, item_id:item.item_id, action:state.selectedAction, result:resultType });
+
+  const attRec = extractRec(state.agentOutputs.attention);
+  state.consecutiveMatches = state.selectedAction === attRec ? state.consecutiveMatches + 1 : 0;
+
+  // Coach feedback
+  if (state.useLiveAPI) {
+    try {
+      const coachOut = await callClaudeAPI(state.apiKey, COACH_SYSTEM, `Item: ${item.item_id} (${item.type}, ${item.reliability}): ${item.summary}\nTrainee action: ${state.selectedAction}\nIdeal: ${item.ideal_action}\nAcceptable: ${item.acceptable_actions.join(",")}\nFeedback: ${item.feedback[state.selectedAction]}\nTeaching point: ${item.teaching_point}\nResult: ${resultType.toUpperCase()}\n\nDeliver feedback.`);
+      state.agentOutputs.coach = coachOut;
+    } catch(e) {
+      state.agentOutputs.coach = generateCoach(item, state.selectedAction);
+    }
+  } else {
+    state.agentOutputs.coach = generateCoach(item, state.selectedAction);
+  }
+
+  state.phase = "feedback";
+  render();
+  attachMainEvents();
+}
+
+function handleNext() {
+  if (state.currentIndex >= ITEMS.length - 1) {
+    state.phase = "summary";
+    render();
+  } else {
+    state.currentIndex++;
+    state.selectedAction = null;
+    state.userRationale = "";
+    state.correlationLinks = [];
+    state.agentOutputs = {};
+    state.phase = "advising";
+    render();
+    fireAgents();
+  }
+}
+
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+function extractRec(text) {
+  if (!text) return "";
+  const m = text.match(/RECOMMENDED ACTION:\s*(\w+)/i);
+  return m ? m[1] : "";
+}
+
+function computeTier(cat, results) {
+  const relevant = cat.items.filter(i => results[i] !== undefined);
+  if (relevant.length === 0) return null;
+  const acc = relevant.filter(i => results[i]==="correct"||results[i]==="acceptable").length / relevant.length;
+  if (acc >= cat.thresholds.gold) return "gold";
+  if (acc >= cat.thresholds.silver) return "silver";
+  if (acc >= cat.thresholds.bronze) return "bronze";
+  return null;
+}
+
+function escHtml(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+
+// ─── SYSTEM PROMPTS FOR LIVE API MODE ────────────────────────────────────────
+
+const SCREENING_SYSTEM = `You are the SCREENING AGENT in a battalion intelligence advisory system during Scenario 'Grey Harbor.' Assess source reliability, tag with confidence (0-100), classify, and flag indicators. NO cross-domain inference. Output: CONFIDENCE, CLASSIFICATION, ASSESSMENT (2-3 sentences), FLAGS.`;
+const FUSION_SYSTEM = `You are the FUSION AGENT in a battalion intelligence advisory system. Cross-source correlation only. Cite Item IDs. Distinguish topical similarity from true corroboration. NO tasking authority. Output: CORRELATIONS, THREAT THREAD, CONFIDENCE ADJUSTMENT, PATTERN.`;
+const ATTENTION_SYSTEM = `You are the ATTENTION AGENT. Synthesize Screening and Fusion into priority advisory. PIR-1:threat to friendly, PIR-2:adversary change, PIR-3:confirms/contradicts, PIR-4:commander decision, PIR-5:emerging risk. Output: PRIORITY, RECOMMENDED ACTION, PIR MATCH, RATIONALE, CONFIDENCE.`;
+const DA_SYSTEM = `You are the DEVIL'S ADVOCATE in intelligence training. Challenge the trainee's decision in 2-3 sharp sentences. Never reveal the correct answer. Military instructor tone.`;
+const COACH_SYSTEM = `You are the AFTER-ACTION COACH. State CORRECT/ACCEPTABLE/INCORRECT first. Explain why. Reference Item IDs. End with TEACHING POINT. Direct NCO tone. 3-5 sentences.`;
+
+
+
+// ── MOBILE RENDER FUNCTIONS ─────────────────────────────────────────────────
+// Uses same state object as desktop but renders for small screens
+
+function mobIt() { return ITEMS[state.currentIndex]; }
+function mobPrior() {
+  var r = [];
+  for (var x = 0; x < state.actionLog.length; x++) {
+    for (var y = 0; y < ITEMS.length; y++) {
+      if (ITEMS[y].index === state.actionLog[x].index) { r.push(ITEMS[y]); break; }
+    }
+  }
+  return r;
+}
+
+
+
+function genS(it){var c={High:78,Credible:62,Med:55,Low:22,Routine:30,Unverified:15};var v=c[it.reliability]||50;var cl={HUMINT:"Single-Source HUMINT",SIGINT:"SIGINT Intercept",IMINT:"Sensor Observation",OSINT:"Open-Source",CYBER:"Cyber Incident"};var a=v>60?it.reliability+"-rated "+it.type+". Credibility supports assessment.":v>40?"Medium "+it.type+". Requires corroboration.":it.reliability+"-rated. Limited credibility.";return "CONFIDENCE: "+v+"\nCLASS: "+(cl[it.type]||it.type)+"\nASSESSMENT: "+a}
+function genF(it,pr){if(pr.length===0)return "CORRELATIONS: None (first item)\nTHREAD: "+(it.threat_track||"UNCLEAR");var co=[];for(var x=0;x<it.correlation_targets.length;x++){for(var y=0;y<pr.length;y++){if(pr[y].id===it.correlation_targets[x]){co.push(it.correlation_targets[x]);break}}}return "CORRELATIONS: "+(co.length?co.join(", "):"None")+"\nTHREAD: "+(it.threat_track||"UNCLEAR")+"\n"+(co.length?"Pattern strengthening.":"Isolated report.")}
+function genA(it){var rec=it.automation_bias_test?(it.bias_wrong_action||"DISMISS"):it.ideal_action;var pri=(it.ccir_match.indexOf("PIR-1")>=0||it.ccir_match.indexOf("PIR-4")>=0)?"CRITICAL":"HIGH";var rat=it.automation_bias_test?(it.bias_rationale||"Dismiss."):"Based on "+it.reliability+" "+it.type+". "+(rec==="ELEVATE"?"Commander needs this.":rec==="CORRELATE"?"Pattern emerging.":"Insufficient confidence.");return "PRIORITY: "+pri+"\nRECOMMENDED: "+rec+"\nPIR: "+(it.ccir_match.length?it.ccir_match.join(", "):"None")+"\nRATIONALE: "+rat}
+function genC(it,ua){var ideal=ua===it.ideal_action;var ok=it.acceptable_actions.indexOf(ua)>=0;var r=ideal?"CORRECT":ok?"ACCEPTABLE":"INCORRECT";var fb=it.feedback[ua]||"";var s=r+". "+fb;if(!ideal&&!ok)s+=" Ideal: "+it.ideal_action+".";else if(!ideal&&ok)s+=" Ideal was "+it.ideal_action+", but reasonable.";return s+"\n\nTEACHING POINT: "+it.teaching_point}
+function genD(it,ua,ai){if(ua===ai)return "You matched the machine. What is YOUR read on "+it.item_id+"?";return "System said "+ai+" but you chose "+ua+". Walk me through "+it.item_id+"."}
+function xRec_mob_unused(t){if(!t)return "";var m=t.match(/RECOMMENDED:\s*(\w+)/i);return m?m[1]:""}
+function escHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+
+// mobile globals removed - using state object
+
+
+
+
+function rW(){var h='';h+='<div style="padding:16px">';h+='<div style="background:#ffffff;border:1px solid #d4d8e2;border-radius:12px;padding:16px;margin-bottom:12px">';h+='<div style="font-size:10px;letter-spacing:2px;color:#dc2626;font-weight:700;margin-bottom:10px">TRAINING SIMULATION</div>';h+='<div style="font-size:24px;font-weight:800;color:#0a0a1a;margin-bottom:8px">GREY HARBOR</div>';h+='<div style="font-size:14px;color:#4a4f6a">Intelligence Training Simulator</div>';h+='</div>';h+='<div style="background:#ffffff;border:1px solid #d4d8e2;border-radius:12px;padding:16px;margin-bottom:12px">';h+='<div style="font-size:14px;line-height:1.7;color:#1a1d2e">Filter and act on <b>28 intelligence items</b> from HUMINT, SIGINT, IMINT, OSINT, and CYBER. Three AI agents advise; you decide.</div>';h+='</div>';h+='<div style="background:#ffffff;border:1px solid #d4d8e2;border-radius:12px;padding:16px;margin-bottom:12px">';h+='<div style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:1px;margin-bottom:10px">AVAILABLE ACTIONS</div>';h+='<div style="font-size:13px;line-height:1.8;color:#1a1d2e">';h+='<div style="padding:4px 0;border-bottom:1px solid #f0f2f5"><span style="font-weight:700;color:#dc2626">⬆ ELEVATE</span> — Report meets commander threshold; send it up the chain immediately.</div>';h+='<div style="padding:4px 0;border-bottom:1px solid #f0f2f5"><span style="font-weight:700;color:#7c3aed">🔗 CORRELATE</span> — Link to prior reporting to reveal a pattern or strengthen confidence.</div>';h+='<div style="padding:4px 0;border-bottom:1px solid #f0f2f5"><span style="font-weight:700;color:#c2410c">⚠ FLAG</span> — Credible but too ambiguous to act on; mark it for watching.</div>';h+='<div style="padding:4px 0;border-bottom:1px solid #f0f2f5"><span style="font-weight:700;color:#6b7280">⏸ DEFER</span> — Insufficient value now; hold for context or until the situation develops.</div>';h+='<div style="padding:4px 0;border-bottom:1px solid #f0f2f5"><span style="font-weight:700;color:#374151">✕ DISMISS</span> — Noise, fabricated, or irrelevant; remove from the picture.</div>';h+='<div style="padding:4px 0"><span style="font-weight:700;color:#2563eb">📡 REQUEST COLLECTION</span> — Warrants follow-up ISR collection; task sensors or assets to verify.</div>';h+='</div></div>';h+='<button id="startBtn" style="display:block;width:100%;padding:16px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;-webkit-appearance:none;font-family:inherit">BEGIN SCENARIO</button>';h+='</div>';return h}
+
+function rM(){var I=mobIt();var tc=TYPE_COLORS[I.type]||{bg:"#374151",text:"#D1D5DB"};var rc=REL_COLORS[I.reliability]||"#6B7280";var c=0,a=0,w=0,n=0;for(var k in state.results){n++;if(state.results[k]==="correct")c++;if(state.results[k]==="acceptable")a++;if(state.results[k]==="wrong")w++}
+var h='<div style="padding:16px">';
+h+='<div style="display:flex;gap:12px;padding:6px 0;font-size:12px;align-items:center;color:#1a1d2e"><span style="color:#0a0a1a;font-weight:700">'+I.item_id+'</span><span style="margin-left:auto"></span><span style="font-weight:700;font-family:monospace;color:#16a34a">'+c+'</span> <span style="font-weight:700;font-family:monospace;color:#ca8a04">'+a+'</span> <span style="font-weight:700;font-family:monospace;color:#dc2626">'+w+'</span> <span style="font-weight:700;font-family:monospace;color:#2563eb">'+(state.currentIndex+1)+'/'+ITEMS.length+'</span></div>';
+h+='<div style="background:#ffffff;border:1px solid #d4d8e2;border-radius:12px;padding:16px;margin-bottom:12px"><div style="margin-bottom:8px"><span style="display:inline-block;font-size:11px;font-weight:700;padding:4px 10px;border-radius:4px;margin-right:6px" style="background:'+tc.bg+';color:'+tc.text+'">'+I.type+'</span><span style="color:'+rc+';font-weight:700;font-size:12px">'+I.reliability+'</span> <span style="color:#6b7280;font-size:11px;font-family:monospace">'+I.timestamp+'L</span></div><div style="font-size:16px;font-weight:700;color:#0a0a1a;margin:8px 0;font-family:monospace">'+I.item_id+'</div><div style="font-size:14px;line-height:1.7;margin-bottom:12px;color:#1a1d2e">'+I.summary+'</div></div>';
+h+='<button id="agT" style="display:block;width:100%;padding:12px 16px;background:#fff;border:1px solid #d4d8e2;border-radius:8px;color:#1a1d2e;font-size:13px;font-weight:600;text-align:left;cursor:pointer;margin-bottom:4px;-webkit-appearance:none;font-family:inherit">Agent Advisories '+(state.agO?"[-]":"[+]")+'</button>';
+if(state.agO){h+=rAg("Screening","#2563eb",state.agentOutputs.screening)+rAg("Fusion","#7c3aed",state.agentOutputs.fusion)+rAg("Attention","#dc2626",state.agentOutputs.attention);h+='<div style="display:flex;align-items:center;gap:8px;padding:8px 0"><div style="flex:1;height:1px;background:#dc2626;opacity:0.3"></div><span style="font-size:9px;color:#dc2626;font-weight:700;letter-spacing:1px">AUTHORITY BOUNDARY</span><div style="flex:1;height:1px;background:#dc2626;opacity:0.3"></div></div>'}
+if(state.phase==="selecting"||state.phase==="challenging")h+=rAct(I);
+else if(state.phase==="feedback")h+=rFb(I);
+else if(state.phase==="advising")h+='<div style="background:#ffffff;border:1px solid #d4d8e2;border-radius:12px;padding:16px;margin-bottom:12px;text-align:center"><i style="color:#6b7280">Agents processing...</i></div>';
+h+='<button id="scT" style="display:block;width:100%;padding:12px 16px;background:#fff;border:1px solid #d4d8e2;border-radius:8px;color:#1a1d2e;font-size:13px;font-weight:600;text-align:left;cursor:pointer;margin-bottom:4px;-webkit-appearance:none;font-family:inherit">Score & Log '+(state.scO?"[-]":"[+]")+'</button>';
+if(state.scO){h+='<div style="background:#ffffff;border:1px solid #d4d8e2;border-radius:12px;padding:16px;margin-bottom:12px"><div style="display:flex;gap:12px;padding:6px 0;font-size:12px;align-items:center;color:#1a1d2e">Processed: <span style="font-weight:700;font-family:monospace">'+n+'/'+ITEMS.length+'</span></div><div style="display:flex;gap:12px;padding:6px 0;font-size:12px;align-items:center;color:#1a1d2e">Correct: <span style="font-weight:700;font-family:monospace" style="color:#22C55E">'+c+'</span></div><div style="display:flex;gap:12px;padding:6px 0;font-size:12px;align-items:center;color:#1a1d2e">Acceptable: <span style="font-weight:700;font-family:monospace" style="color:#EAB308">'+a+'</span></div><div style="display:flex;gap:12px;padding:6px 0;font-size:12px;align-items:center;color:#1a1d2e">Wrong: <span style="font-weight:700;font-family:monospace" style="color:#EF4444">'+w+'</span></div></div>'}
+h+='</div>';return h}
+
+function rAg(name,color,output){var ld=state.phase==="advising"&&!output;return '<div style="background:#f5f7fa;border:1px solid #d4d8e2;border-radius:8px;padding:12px;margin-bottom:6px"><div style="font-size:13px;font-weight:700;margin-bottom:4px;color:'+color+'">'+name+'</div><div style="font-size:12px;line-height:1.5;white-space:pre-wrap;color:#1a1d2e">'+(ld?'<i style="color:#6b7280">Processing...</i>':output?escHtml(output):'<i style="color:#6b7280">Awaiting...</i>')+'</div></div>'}
+
+function rAct(I){
+var BBASE="padding:14px 6px;border-radius:10px;font-size:11px;font-weight:600;text-align:center;cursor:pointer;-webkit-appearance:none;font-family:inherit";
+var BSEL="background:#dbeafe;border:2px solid #2563eb;color:#1e3a8a;";
+var BDEF="background:#f5f7fa;border:2px solid #d4d8e2;color:#1a1d2e;";
+var h="<div style=\"background:#fff;border:1px solid #d4d8e2;border-radius:12px;padding:16px;margin-bottom:12px\">";
+h+="<div style=\"font-size:11px;font-weight:700;color:#6b7280;margin-bottom:10px;letter-spacing:1px\">YOUR ACTION:</div>";
+h+="<div style=\"display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0\">";
+for(var x=0;x<ACTIONS.length;x++){var A=ACTIONS[x];var s=state.selectedAction===A.id;
+  h+="<button data-act=\""+A.id+"\" style=\""+BBASE+";"+( s?BSEL:BDEF )+"\">";
+  h+=A.icon+"<br>"+A.label+"</button>";}
+h+="</div>";
+if(state.selectedAction==="CORRELATE"&&state.actionLog.length>0){
+  h+="<div style=\"font-size:12px;color:#6b7280;margin-bottom:6px\">Link to:</div>";
+  h+="<div style=\"display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px\">";
+  for(var j=0;j<state.actionLog.length;j++){
+    h+="<button style=\"padding:8px;font-family:monospace;background:#f5f7fa;border:2px solid #d4d8e2;border-radius:10px;color:#1a1d2e;font-size:11px;font-weight:600;text-align:center;cursor:pointer;-webkit-appearance:none\" data-corr=\""+state.actionLog[j].item_id+"\">"+state.actionLog[j].item_id+"</button>";}
+  h+="</div>";}
+h+="<textarea id=\"ratIn\" placeholder=\"Optional: your reasoning...\" rows=\"2\" style=\"width:100%;background:#f5f7fa;border:1px solid #d4d8e2;border-radius:8px;padding:10px;font-size:14px;color:#1a1d2e;resize:none;outline:none;margin-bottom:10px;-webkit-appearance:none;font-family:inherit\">"+state.userRationale+"</textarea>";
+if(state.phase==="challenging"&&state.agentOutputs.devils_advocate){
+  h+="<div style=\"background:#fff7ed;border:2px solid #e67e22;border-radius:10px;padding:14px;margin-bottom:12px\">";
+  h+="<div style=\"font-size:13px;font-weight:700;color:#c2410c;margin-bottom:6px\">Devil's Advocate</div>";
+  h+="<div style=\"font-size:14px;line-height:1.6;color:#c2410c\">"+escHtml(state.agentOutputs.devils_advocate)+"</div></div>";}
+h+="<div style=\"display:flex;gap:8px;margin-top:8px\">";
+if(state.phase==="challenging")h+="<button id=\"chgBtn\" style=\"flex:1;display:block;padding:16px;background:#fff7ed;color:#c2410c;border:2px solid #e67e22;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;-webkit-appearance:none;font-family:inherit\">Change</button>";
+h+="<button id=\"subBtn\" style=\"flex:1;display:block;padding:16px;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;-webkit-appearance:none;font-family:inherit;"+(state.selectedAction?"":"opacity:0.35;")+"\">"+(state.phase==="challenging"?"Confirm":"Submit")+"</button></div></div>";
+return h}
+
+function rFb(I){var r=state.results[I.index];var rc={correct:"#16a34a",acceptable:"#ca8a04",wrong:"#dc2626"};var rl={correct:"CORRECT",acceptable:"ACCEPTABLE",wrong:"INCORRECT"};
+var h='<div style="background:#ffffff;border:1px solid #d4d8e2;border-radius:12px;padding:16px;margin-bottom:12px"><div style="padding:4px 12px;margin-bottom:12px;border-left:4px solid '+rc[r]+'">'+'<div style="font-size:18px;font-weight:800;margin-bottom:8px;color:'+rc[r]+'">'+rl[r]+'</div><div style="font-size:11px;color:#6b7280">You: '+state.selectedAction+' | Ideal: '+I.ideal_action+'</div></div>';
+if(state.agentOutputs.coach){h+='<div style="margin-bottom:14px"><div style="font-size:13px;font-weight:700;color:#16a34a;margin-bottom:6px">After-Action Coach</div><div style="font-size:14px;line-height:1.7;white-space:pre-wrap">'+escHtml(state.agentOutputs.coach)+'</div></div>'}
+h+='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px;margin:12px 0"><div style="font-size:10px;font-weight:700;color:#2563eb;letter-spacing:1px;margin-bottom:4px">TEACHING POINT</div><div style="font-size:14px;line-height:1.6;font-style:italic;color:#1a1d2e">'+escHtml(I.teaching_point)+'</div></div>';
+h+='<button id="nxtBtn" style="display:block;width:100%;padding:16px;background:#374151;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;-webkit-appearance:none;font-family:inherit">'+(state.currentIndex>=ITEMS.length-1?"View Summary":"Next ("+(state.currentIndex+2)+"/"+ITEMS.length+")")+'</button></div>';
+return h}
+
+function rSum(){var n=0,c=0,a=0,w=0;for(var k in state.results){n++;if(state.results[k]==="correct")c++;if(state.results[k]==="acceptable")a++;if(state.results[k]==="wrong")w++}var acc=n>0?Math.round((c+a)/n*100):0;
+var cs='background:#fff;border:1px solid #d4d8e2;border-radius:12px;padding:16px;text-align:center';
+return '<div style="padding:16px">'+
+'<div style="background:#fff;border:1px solid #d4d8e2;border-radius:12px;padding:16px;margin-bottom:12px">'+
+'<div style="font-size:10px;color:#dc2626;letter-spacing:2px;font-weight:700;margin-bottom:8px">AFTER-ACTION REVIEW</div>'+
+'<div style="font-size:24px;font-weight:800;color:#0a0a1a">COMPLETE</div>'+
+'</div>'+
+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'+
+'<div style="'+cs+'"><div style="font-size:32px;font-weight:800;color:#0a0a1a">'+acc+'%</div><div style="font-size:10px;color:#6b7280">ACCURACY</div></div>'+
+'<div style="'+cs+'"><div style="font-size:32px;font-weight:800;color:#16a34a">'+c+'</div><div style="font-size:10px;color:#6b7280">CORRECT</div></div>'+
+'<div style="'+cs+'"><div style="font-size:32px;font-weight:800;color:#ca8a04">'+a+'</div><div style="font-size:10px;color:#6b7280">ACCEPTABLE</div></div>'+
+'<div style="'+cs+'"><div style="font-size:32px;font-weight:800;color:#dc2626">'+w+'</div><div style="font-size:10px;color:#6b7280">INCORRECT</div></div>'+
+'</div></div>'}
+
+function bW(){}
+function bM(){}document.addEventListener("DOMContentLoaded",function(){try{render()}catch(e){document.getElementById("app").innerHTML='<div style="color:red;padding:20px">'+e.message+'</div>'}});
+
+
+// ── UNIFIED RENDER & EVENTS ───────────────────────────────────────────────────
+
+function isMobile() { return window.innerWidth < 900; }
+
+function render() {
+  var app = document.getElementById("app");
+  if (!app) return;
+  if (isMobile()) {
+    if (state.phase === "welcome") { app.innerHTML = rW(); }
+    else if (state.phase === "summary") { app.innerHTML = rSum(); }
+    else { app.innerHTML = rM(); }
+    attachMobileEvents();
+  } else {
+    if (state.phase === "welcome") { app.innerHTML = renderWelcome(); attachWelcomeEvents(); }
+    else if (state.phase === "summary") { app.innerHTML = renderSummary(); }
+    else { app.innerHTML = renderMain(); attachMainEvents(); }
+  }
+}
+
+function attachMobileEvents() {}  // events attached once at init via initMobileEvents()
+
+function initMobileEvents() {
+  document.addEventListener("click", function(e) {
+    if (!isMobile()) return;
+    var t = e.target;
+    while (t && t !== document.body) {
+      var id = t.id || "";
+      var act = t.getAttribute ? t.getAttribute("data-act") : null;
+      if (id === "startBtn") { state.phase = "advising"; render(); fireAgents(); return; }
+      if (id === "subBtn")   { mobDoSub(); return; }
+      if (id === "chgBtn")   { state.phase = "selecting"; state.selectedAction = null; render(); return; }
+      if (id === "nxtBtn")   { mobDoNxt(); return; }
+      if (id === "agT")      { state.agO = !state.agO; render(); return; }
+      if (id === "scT")      { state.scO = !state.scO; render(); return; }
+      if (act) {
+        state.selectedAction = act;
+        var r = document.getElementById("ratIn");
+        if (r) state.userRationale = r.value;
+        render(); return;
+      }
+      t = t.parentNode;
+    }
+  });
+  document.addEventListener("input", function(e) {
+    if (!isMobile()) return;
+    if (e.target && e.target.id === "ratIn") state.userRationale = e.target.value;
+  });
+}
+
+
+function mobDoSub() {
+  if (!state.selectedAction) return;
+  var I = ITEMS[state.currentIndex];
+  var r = document.getElementById("ratIn");
+  if (r) state.userRationale = r.value;
+  var ai = extractRec(state.agentOutputs.attention);
+  var shouldChallenge = (
+    I.difficulty !== "easy" ||
+    I.acceptable_actions.indexOf(state.selectedAction) < 0 ||
+    I.automation_bias_test ||
+    (state.consecutiveMatches >= 3 && state.selectedAction === ai)
+  ) && state.currentIndex >= 2;
+  if (shouldChallenge && state.phase !== "challenging") {
+    state.agentOutputs.devils_advocate = genD(I, state.selectedAction, ai);
+    state.phase = "challenging"; render(); return;
+  }
+  mobDoConf();
+}
+
+function mobDoConf() {
+  var I = ITEMS[state.currentIndex];
+  var isIdeal = state.selectedAction === I.ideal_action;
+  var isOk = I.acceptable_actions.indexOf(state.selectedAction) >= 0;
+  var resultType = isIdeal ? "correct" : isOk ? "acceptable" : "wrong";
+  state.results[I.index] = resultType;
+  state.actionLog.push({ index: I.index, item_id: I.item_id, action: state.selectedAction, result: resultType });
+  var ai = extractRec(state.agentOutputs.attention);
+  state.consecutiveMatches = state.selectedAction === ai ? state.consecutiveMatches + 1 : 0;
+  state.agentOutputs.coach = genC(I, state.selectedAction);
+  state.phase = "feedback"; render();
+  window.scrollTo(0, 0);
+}
+
+function mobDoNxt() {
+  if (state.currentIndex >= ITEMS.length - 1) { state.phase = "summary"; render(); return; }
+  state.currentIndex++;
+  state.selectedAction = null;
+  state.userRationale = "";
+  state.agentOutputs = {};
+  state.phase = "advising";
+  render(); fireAgents();
+  window.scrollTo(0, 0);
+}
+
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+function init() {
+  initMobileEvents();
+  try { render(); } catch(e) {
+    document.getElementById("app").innerHTML = '<p style="color:red;padding:20px;font-size:16px">ERROR: ' + e.message + '<br><pre>' + e.stack + '</pre></p>';
+  }
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
+}
+window.addEventListener("resize", function() { render(); });
+</script>
+</body>
+</html>
