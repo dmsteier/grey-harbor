@@ -1,0 +1,2793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grey Harbor — Intelligence Training Simulator v3</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-base: #080C14;
+  --bg-surface: #0D1421;
+  --bg-raised: #121A2B;
+  --bg-overlay: #1A2438;
+  --border: #1E2D45;
+  --border-bright: #2A3F5C;
+  --text-primary: #E2E8F0;
+  --text-secondary: #8FA3C0;
+  --text-muted: #4A6080;
+  --accent-blue: #3B82F6;
+  --accent-blue-dim: rgba(59,130,246,0.12);
+  --accent-red: #EF4444;
+  --accent-red-dim: rgba(239,68,68,0.1);
+  --accent-amber: #F59E0B;
+  --accent-amber-dim: rgba(245,158,11,0.1);
+  --accent-green: #10B981;
+  --accent-green-dim: rgba(16,185,129,0.1);
+  --accent-purple: #8B5CF6;
+  --accent-cyan: #06B6D4;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-display: 'Bebas Neue', sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+@keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+@keyframes slideRight { from{transform:scaleX(0)} to{transform:scaleX(1)} }
+
+.fade-up { animation: fadeUp 0.35s ease-out forwards; }
+.fade-in { animation: fadeIn 0.25s ease-out; }
+
+/* ── SCROLLBARS ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+
+/* ══════════════════════════════════════════════════
+   SHARED COMPONENTS
+══════════════════════════════════════════════════ */
+.tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.tag-red { background: var(--accent-red-dim); color: var(--accent-red); border: 1px solid rgba(239,68,68,0.2); }
+.tag-blue { background: var(--accent-blue-dim); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.2); }
+.tag-amber { background: var(--accent-amber-dim); color: var(--accent-amber); border: 1px solid rgba(245,158,11,0.2); }
+.tag-green { background: var(--accent-green-dim); color: var(--accent-green); border: 1px solid rgba(16,185,129,0.2); }
+.tag-muted { background: rgba(74,96,128,0.15); color: var(--text-muted); border: 1px solid rgba(74,96,128,0.2); }
+.tag-purple { background: rgba(139,92,246,0.1); color: var(--accent-purple); border: 1px solid rgba(139,92,246,0.2); }
+
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #1D4ED8, var(--accent-blue));
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 28px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-primary:hover { filter: brightness(1.15); transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.35; cursor: default; transform: none; filter: none; }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-ghost:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+
+/* ══════════════════════════════════════════════════
+   SCREEN WRAPPER
+══════════════════════════════════════════════════ */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  overflow-y: auto;
+}
+.screen.active { display: flex; }
+
+/* ══════════════════════════════════════════════════
+   SCREEN 1: LANDING
+══════════════════════════════════════════════════ */
+#screen-landing {
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: radial-gradient(ellipse at 30% 20%, rgba(59,130,246,0.06) 0%, transparent 60%),
+              radial-gradient(ellipse at 70% 80%, rgba(239,68,68,0.04) 0%, transparent 50%),
+              var(--bg-base);
+}
+.landing-inner {
+  max-width: 560px;
+  width: 100%;
+}
+.landing-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: var(--accent-red);
+  font-weight: 700;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.landing-eyebrow::before {
+  content: '';
+  width: 24px;
+  height: 1px;
+  background: var(--accent-red);
+}
+.landing-title {
+  font-family: var(--font-display);
+  font-size: 80px;
+  line-height: 0.9;
+  color: var(--text-primary);
+  letter-spacing: 4px;
+  margin-bottom: 6px;
+}
+.landing-sub {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+  margin-bottom: 32px;
+}
+.landing-body {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.landing-desc {
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+.pir-grid {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.pir-header {
+  background: var(--bg-overlay);
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.pir-row {
+  display: flex;
+  gap: 10px;
+  padding: 7px 12px;
+  border-top: 1px solid var(--border);
+  align-items: baseline;
+}
+.pir-id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent-blue);
+  min-width: 40px;
+}
+.pir-label { font-size: 12px; color: var(--text-secondary); }
+.api-section {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.api-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.api-hint { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; }
+.api-input {
+  width: 100%;
+  background: var(--bg-base);
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.api-input:focus { border-color: var(--accent-blue); }
+.mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  margin-top: 6px;
+}
+.mode-pill.live { background: var(--accent-green-dim); color: var(--accent-green); }
+.mode-pill.prebaked { background: var(--accent-blue-dim); color: var(--accent-blue); }
+.mode-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: pulse 1.5s infinite; }
+
+/* ══════════════════════════════════════════════════
+   SCREEN 2: ACTION DOCTRINE
+══════════════════════════════════════════════════ */
+#screen-doctrine {
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.doctrine-inner {
+  max-width: 720px;
+  width: 100%;
+}
+.doctrine-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.doctrine-title {
+  font-family: var(--font-display);
+  font-size: 48px;
+  letter-spacing: 4px;
+  margin-bottom: 6px;
+}
+.doctrine-subtitle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+}
+.doctrine-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.doctrine-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.doctrine-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--card-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s;
+}
+.doctrine-card:hover { border-color: var(--card-accent); transform: translateY(-2px); }
+.doctrine-card:hover::before { transform: scaleX(1); }
+.doctrine-card-icon { font-size: 28px; margin-bottom: 10px; }
+.doctrine-card-name {
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+  color: var(--card-accent);
+}
+.doctrine-card-short { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+.doctrine-card-consequence { font-size: 11px; color: var(--text-muted); font-style: italic; }
+.doctrine-card-more {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--card-accent);
+  margin-top: 12px;
+  opacity: 0.7;
+}
+
+/* ══════════════════════════════════════════════════
+   MODAL
+══════════════════════════════════════════════════ */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8,12,20,0.85);
+  backdrop-filter: blur(4px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+.modal-backdrop.open { display: flex; }
+.modal-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-bright);
+  border-radius: 12px;
+  padding: 28px;
+  max-width: 480px;
+  width: 100%;
+  animation: fadeUp 0.25s ease-out;
+}
+.modal-box h3 {
+  font-family: var(--font-display);
+  font-size: 28px;
+  letter-spacing: 3px;
+  margin-bottom: 16px;
+}
+.modal-section { margin-bottom: 16px; }
+.modal-section-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.modal-section-text { font-size: 13px; line-height: 1.65; color: var(--text-secondary); }
+.modal-close {
+  float: right;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.modal-close:hover { border-color: var(--accent-red); color: var(--accent-red); }
+.modal-risk {
+  background: var(--accent-red-dim);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #FCA5A5;
+}
+
+/* ══════════════════════════════════════════════════
+   SCREEN 3: THEATER BRIEF
+══════════════════════════════════════════════════ */
+#screen-theater {
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.theater-inner {
+  max-width: 680px;
+  width: 100%;
+}
+.theater-header {
+  margin-bottom: 24px;
+}
+.theater-title {
+  font-family: var(--font-display);
+  font-size: 42px;
+  letter-spacing: 4px;
+  margin-bottom: 4px;
+}
+.theater-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+}
+.theater-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.theater-block {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+.theater-block.full { grid-column: 1 / -1; }
+.theater-block-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.theater-block-text { font-size: 12px; line-height: 1.65; color: var(--text-secondary); }
+.theater-block-text strong { color: var(--text-primary); font-weight: 600; }
+.vuln-list { list-style: none; }
+.vuln-list li {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 3px 0;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.vuln-list li::before {
+  content: '▸';
+  color: var(--accent-amber);
+  font-size: 9px;
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════
+   SCREEN 4: CONTEXT INQUIRY
+══════════════════════════════════════════════════ */
+#screen-context {
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.context-inner {
+  max-width: 640px;
+  width: 100%;
+}
+.context-header { margin-bottom: 20px; }
+.context-title {
+  font-family: var(--font-display);
+  font-size: 38px;
+  letter-spacing: 4px;
+  margin-bottom: 4px;
+}
+.context-sub { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.context-instruction {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-blue);
+  border-radius: 0 8px 8px 0;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  font-style: italic;
+}
+.context-questions { margin-bottom: 16px; }
+.context-q {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 13px 16px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.context-q:hover { border-color: var(--border-bright); color: var(--text-primary); }
+.context-q.selected { border-color: var(--accent-blue); background: var(--accent-blue-dim); color: var(--text-primary); }
+.context-q-radio {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--border-bright);
+  flex-shrink: 0;
+  transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center;
+}
+.context-q.selected .context-q-radio {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue);
+}
+.context-q.selected .context-q-radio::after {
+  content: '';
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: white;
+}
+.context-answer {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  animation: fadeUp 0.3s ease-out;
+}
+.context-answer-q {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.context-answer-text { font-size: 13px; line-height: 1.65; color: var(--text-secondary); margin-bottom: 10px; }
+.context-quality-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.context-quality-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.context-feedback { font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
+.context-implication {
+  background: var(--bg-overlay);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 8px;
+}
+.context-implication strong { color: var(--accent-amber); font-style: normal; }
+
+/* ══════════════════════════════════════════════════
+   MAIN LAYOUT (SCENARIO)
+══════════════════════════════════════════════════ */
+#screen-main {
+  flex-direction: row;
+  overflow: hidden;
+}
+.main-left {
+  width: 256px;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  padding: 14px;
+  overflow-y: auto;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.main-center {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+.main-center-inner { max-width: 620px; margin: 0 auto; }
+.main-right {
+  width: 210px;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border);
+  padding: 14px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+/* Mode badge */
+.mode-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font-mono); font-size: 8px; font-weight: 700;
+  letter-spacing: 1px; padding: 2px 6px; border-radius: 10px; margin-left: auto;
+}
+.mode-badge.live { background: var(--accent-green-dim); color: var(--accent-green); }
+.mode-badge.prebaked { background: var(--accent-blue-dim); color: var(--accent-blue); }
+.mode-badge-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: pulse 1.5s infinite; }
+
+/* ── AGENT CARDS ── */
+.agent-card {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+}
+.agent-card-header {
+  display: flex; align-items: center; gap: 7px; margin-bottom: 6px;
+}
+.agent-icon { font-size: 14px; }
+.agent-name { font-size: 11px; font-weight: 700; }
+.agent-layer { font-size: 9px; color: var(--text-muted); }
+.agent-spinner {
+  width: 6px; height: 6px; border-radius: 50%;
+  margin-left: auto; animation: pulse 0.9s infinite;
+}
+.agent-output {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+.agent-placeholder { font-size: 10px; color: var(--text-muted); font-style: italic; }
+.authority-line {
+  display: flex; align-items: center; gap: 8px; margin: 4px 0;
+}
+.authority-rule { flex: 1; height: 1px; background: rgba(239,68,68,0.3); }
+.authority-text {
+  font-family: var(--font-mono); font-size: 8px; font-weight: 700;
+  letter-spacing: 2px; color: var(--accent-red); opacity: 0.7;
+}
+.your-decision {
+  text-align: center; font-size: 10px; color: var(--text-muted); font-weight: 600;
+}
+
+/* ── INTEL CARD ── */
+.intel-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 14px;
+}
+.intel-card-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px;
+}
+.intel-meta { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+.intel-counter { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+.intel-id {
+  font-family: var(--font-mono); font-size: 14px; font-weight: 700;
+  color: var(--text-primary); margin-bottom: 6px; letter-spacing: 1px;
+}
+.intel-summary { font-size: 14px; line-height: 1.7; color: #D1DCF0; }
+
+/* ── ACTION AREA ── */
+.action-area {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+}
+.action-area-label {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  letter-spacing: 2px; color: var(--text-muted); text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.action-buttons {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  margin-bottom: 14px;
+}
+.action-btn {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 5px; padding: 12px 6px;
+  background: var(--bg-raised); border: 1px solid var(--border);
+  border-radius: 8px; cursor: pointer; transition: all 0.2s;
+  font-family: var(--font-sans);
+  position: relative; overflow: hidden;
+}
+.action-btn::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--btn-color);
+  transform: scaleX(0);
+  transition: transform 0.25s;
+}
+.action-btn:hover { border-color: var(--btn-color); background: color-mix(in srgb, var(--btn-color) 8%, var(--bg-raised)); }
+.action-btn:hover::before { transform: scaleX(1); }
+.action-btn.selected {
+  border-color: var(--btn-color);
+  background: color-mix(in srgb, var(--btn-color) 12%, var(--bg-raised));
+}
+.action-btn.selected::before { transform: scaleX(1); }
+.action-btn-icon { font-size: 18px; }
+.action-btn-label { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; color: var(--text-secondary); }
+.action-btn.selected .action-btn-label { color: var(--btn-color); }
+.action-btn-desc { font-size: 9px; color: var(--text-muted); text-align: center; line-height: 1.3; }
+
+.rationale-input {
+  width: 100%;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-primary);
+  resize: vertical;
+  outline: none;
+  margin-bottom: 10px;
+  transition: border-color 0.2s;
+  line-height: 1.5;
+}
+.rationale-input:focus { border-color: var(--accent-blue); }
+.rationale-input::placeholder { color: var(--text-muted); }
+
+.action-submit-row { display: flex; justify-content: flex-end; }
+
+/* ── COLLECTION SUBFLOW ── */
+.collection-panel {
+  background: var(--bg-raised);
+  border: 1px solid rgba(59,130,246,0.3);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 12px;
+  animation: fadeUp 0.25s ease-out;
+}
+.collection-step-label {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  letter-spacing: 2px; color: var(--accent-blue); text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.collection-options { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.collection-opt {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px 12px; cursor: pointer; transition: all 0.2s;
+  font-size: 12px; color: var(--text-secondary);
+  display: flex; align-items: center; gap: 10px;
+}
+.collection-opt:hover { border-color: var(--accent-blue); color: var(--text-primary); }
+.collection-opt.selected { border-color: var(--accent-blue); background: var(--accent-blue-dim); color: var(--text-primary); }
+.collection-opt-radio {
+  width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border-bright);
+  flex-shrink: 0; transition: all 0.2s;
+}
+.collection-opt.selected .collection-opt-radio {
+  border-color: var(--accent-blue); background: var(--accent-blue);
+}
+.collection-methods { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.method-chip {
+  padding: 5px 10px; border-radius: 4px; border: 1px solid var(--border);
+  background: var(--bg-surface); font-family: var(--font-mono); font-size: 10px;
+  font-weight: 700; color: var(--text-muted); cursor: pointer; transition: all 0.2s;
+  letter-spacing: 0.5px;
+}
+.method-chip:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.method-chip.selected { border-color: var(--accent-cyan); background: rgba(6,182,212,0.1); color: var(--accent-cyan); }
+.collection-result {
+  background: var(--bg-overlay);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-cyan);
+  border-radius: 0 6px 6px 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin-top: 10px;
+  animation: fadeUp 0.25s ease-out;
+}
+.collection-result-label {
+  font-family: var(--font-mono); font-size: 8px; font-weight: 700;
+  letter-spacing: 2px; color: var(--accent-cyan); margin-bottom: 5px; text-transform: uppercase;
+}
+
+/* ── WATCH QUEUE BANNER ── */
+.watch-banner {
+  background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 12px; color: var(--accent-amber);
+  animation: fadeUp 0.3s ease-out;
+}
+.watch-banner-icon { font-size: 16px; }
+
+/* ── FEEDBACK AREA ── */
+.feedback-area {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  animation: fadeUp 0.3s ease-out;
+}
+.feedback-verdict {
+  padding-left: 12px;
+  border-left: 3px solid var(--verdict-color);
+  margin-bottom: 16px;
+}
+.feedback-verdict-text {
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: 3px;
+  color: var(--verdict-color);
+}
+.feedback-verdict-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  letter-spacing: 1px;
+}
+.coach-output { margin-bottom: 14px; }
+.coach-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.coach-label { font-size: 11px; font-weight: 700; color: var(--accent-green); font-family: var(--font-mono); letter-spacing: 1px; }
+.coach-text { font-size: 13px; line-height: 1.65; color: var(--text-secondary); }
+.teaching-point {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+.tp-label { font-family: var(--font-mono); font-size: 8px; font-weight: 700; letter-spacing: 2px; color: var(--accent-blue); margin-bottom: 5px; text-transform: uppercase; }
+.tp-text { font-size: 13px; line-height: 1.6; color: var(--text-primary); font-style: italic; }
+.next-btn {
+  width: 100%; padding: 12px;
+  background: var(--bg-overlay); border: 1px solid var(--border-bright);
+  border-radius: 8px; font-family: var(--font-mono); font-size: 12px;
+  font-weight: 700; letter-spacing: 1px; color: var(--text-secondary); cursor: pointer; transition: all 0.2s;
+}
+.next-btn:hover { background: var(--border); color: var(--text-primary); }
+
+/* ── RIGHT PANEL ── */
+.rp-block { margin-bottom: 16px; }
+.rp-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; padding: 4px 0; border-bottom: 1px solid rgba(30,45,69,0.4);
+}
+.rp-val { font-family: var(--font-mono); font-weight: 700; font-size: 12px; }
+.rp-watch-item {
+  font-family: var(--font-mono); font-size: 9px; color: var(--accent-amber);
+  padding: 2px 0; letter-spacing: 0.5px;
+}
+
+/* Badge progress */
+.badge-prog { margin-bottom: 8px; }
+.badge-prog-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; font-size: 10px; }
+.badge-prog-label { color: var(--text-secondary); }
+.badge-tier {
+  font-family: var(--font-mono); font-size: 8px; font-weight: 800;
+  padding: 1px 5px; border-radius: 3px;
+}
+.tier-gold { background: #FDE68A; color: #92400E; }
+.tier-silver { background: #E5E7EB; color: #374151; }
+.tier-bronze { background: #FED7AA; color: #7C2D12; }
+.prog-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+
+/* Log entries */
+.log-entry { padding: 5px 0; border-bottom: 1px solid rgba(30,45,69,0.3); }
+.log-top { display: flex; align-items: center; gap: 5px; }
+.log-id { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }
+.log-action { font-size: 10px; margin-top: 2px; font-weight: 500; }
+.log-dot { width: 6px; height: 6px; border-radius: 50%; margin-left: auto; }
+
+/* ══════════════════════════════════════════════════
+   SUMMARY SCREEN
+══════════════════════════════════════════════════ */
+#screen-summary {
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.summary-inner { max-width: 680px; width: 100%; }
+.summary-header { margin-bottom: 24px; }
+.summary-title { font-family: var(--font-display); font-size: 52px; letter-spacing: 4px; margin-bottom: 4px; }
+.summary-sub { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); letter-spacing: 2px; }
+.summary-counters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+.summary-stat {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px 12px; text-align: center;
+}
+.summary-stat-num { font-family: var(--font-display); font-size: 36px; color: var(--stat-color, var(--text-primary)); }
+.summary-stat-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 2px; color: var(--text-muted); text-transform: uppercase; margin-top: 4px; }
+.summary-action-counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+.summary-action-stat {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px; text-align: center;
+}
+.summary-action-num { font-family: var(--font-mono); font-size: 22px; font-weight: 700; }
+.summary-action-label { font-size: 9px; color: var(--text-muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 1px; }
+.summary-badges {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px; margin-bottom: 20px;
+}
+.summary-badge-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.summary-badge-row:last-child { border-bottom: none; }
+.summary-coach {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border: 1px solid rgba(16,185,129,0.2); border-radius: 10px; padding: 16px; margin-bottom: 20px;
+}
+.summary-coach-label {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  letter-spacing: 2px; color: var(--accent-green); margin-bottom: 8px; text-transform: uppercase;
+}
+.summary-coach-text { font-size: 13px; line-height: 1.7; color: var(--text-secondary); }
+.restart-btn {
+  width: 100%; padding: 14px;
+  background: linear-gradient(135deg, #1D4ED8, var(--accent-blue));
+  color: white; border: none; border-radius: 8px;
+  font-family: var(--font-mono); font-size: 13px; font-weight: 700; letter-spacing: 2px;
+  cursor: pointer; transition: all 0.2s;
+}
+.restart-btn:hover { filter: brightness(1.1); }
+
+/* ══════════════════════════════════════════════════
+   TYPE / RELIABILITY COLORS
+══════════════════════════════════════════════════ */
+.type-HUMINT { background: #92400E; color: #FDE68A; }
+.type-SIGINT { background: #1E3A5F; color: #93C5FD; }
+.type-IMINT { background: #14532D; color: #86EFAC; }
+.type-OSINT { background: #44403C; color: #D6D3D1; }
+.type-CYBER { background: #7F1D1D; color: #FCA5A5; }
+
+/* ══════════════════════════════════════════════════
+   MOBILE
+══════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .landing-title { font-size: 56px; }
+  .doctrine-grid { grid-template-columns: 1fr; }
+  .theater-grid { grid-template-columns: 1fr; }
+  #screen-main { flex-direction: column; overflow: auto; }
+  .main-left { width: 100%; border-right: none; border-bottom: 1px solid var(--border); overflow: visible; height: auto; }
+  .main-right { width: 100%; border-left: none; border-top: 1px solid var(--border); }
+  .action-buttons { grid-template-columns: repeat(2, 1fr); }
+  .summary-counters { grid-template-columns: repeat(2, 1fr); }
+  .summary-action-counts { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── SCENARIO SELECTOR ──────────────────────────────────── */
+#screen-scenario { align-items:center; justify-content:center; padding:20px; }
+.scenario-inner { max-width:680px; width:100%; }
+.scenario-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:24px; }
+@media (max-width:600px) { .scenario-grid { grid-template-columns:1fr; } }
+.scenario-card {
+  background:var(--bg-surface); border:2px solid var(--border);
+  border-radius:12px; padding:22px 18px; cursor:pointer;
+  transition:all .2s; text-align:center; position:relative; overflow:hidden;
+}
+.scenario-card::before {
+  content:''; position:absolute; inset:0; opacity:0;
+  background:linear-gradient(135deg, var(--sc-color-a), var(--sc-color-b));
+  transition:opacity .25s;
+}
+.scenario-card:hover { border-color:var(--sc-border); transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,.3); }
+.scenario-card:hover::before { opacity:.05; }
+.scenario-card.selected { border-color:var(--sc-border); }
+.scenario-card.selected::before { opacity:.08; }
+.sc-icon  { font-size:32px; margin-bottom:10px; position:relative; z-index:1; }
+.sc-name  { font-family:var(--font-display); font-size:26px; letter-spacing:2px; color:var(--sc-border); margin-bottom:6px; position:relative; z-index:1; }
+.sc-count { font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:2px; color:var(--txt3); margin-bottom:10px; position:relative; z-index:1; }
+.sc-desc  { font-size:12px; color:var(--txt2); line-height:1.6; position:relative; z-index:1; }
+.sc-badge { display:inline-block; font-family:var(--font-mono); font-size:8px; font-weight:700; letter-spacing:1px; padding:2px 8px; border-radius:10px; margin-top:10px; position:relative; z-index:1; }
+
+/* ── RESET BUTTON ───────────────────────────────────────── */
+.reset-btn {
+  background:transparent; border:1px solid var(--border-bright); border-radius:5px;
+  color:var(--txt3); font-family:var(--font-mono); font-size:9px; font-weight:700;
+  letter-spacing:1px; padding:4px 10px; cursor:pointer; transition:all .2s;
+  white-space:nowrap;
+}
+.reset-btn:hover { border-color:var(--accent-amber); color:var(--accent-amber); }
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ══ SCREEN 1: LANDING ══ -->
+<div id="screen-landing" class="screen active">
+  <div class="landing-inner">
+    <div class="landing-eyebrow">TRAINING SIMULATION — UNCLASSIFIED</div>
+    <h1 class="landing-title">GREY<br>HARBOR</h1>
+    <div class="landing-sub">BATTALION INTELLIGENCE TRAINING SIMULATOR — V3</div>
+    <div class="landing-body">
+      <p class="landing-desc">You are an intelligence analyst supporting a battalion in a contested coastal corridor. Filter, prioritize, and act on HUMINT, SIGINT, IMINT, OSINT, and CYBER intelligence reports. Choose your scenario after reviewing the action doctrine.</p>
+      <p class="landing-desc" style="margin-bottom:0">Three AI advisory agents will assist — but the decision and the doctrine are yours.</p>
+      <div class="pir-grid" style="margin-top:16px">
+        <div class="pir-header">COMMANDER'S PRIORITY INTELLIGENCE REQUIREMENTS</div>
+        <div class="pir-row"><span class="pir-id">PIR-1</span><span class="pir-label">Credible, time-bound threat to friendly forces</span></div>
+        <div class="pir-row"><span class="pir-id">PIR-2</span><span class="pir-label">Change in adversary capability, intent, or positioning</span></div>
+        <div class="pir-row"><span class="pir-id">PIR-3</span><span class="pir-label">Confirms or contradicts prior assessments</span></div>
+        <div class="pir-row"><span class="pir-id">PIR-4</span><span class="pir-label">Requires commander decision or escalation</span></div>
+        <div class="pir-row"><span class="pir-id">PIR-5</span><span class="pir-label">Emerging operational risk not previously tracked</span></div>
+      </div>
+      <div class="api-section">
+        <div class="api-label">Anthropic API Key (Optional)</div>
+        <div class="api-hint">Provide a key for live AI agent responses. Leave blank for pre-baked mode.</div>
+        <input class="api-input" type="password" id="apiKeyInput" placeholder="sk-ant-...">
+        <div id="modePill" class="mode-pill prebaked"><span class="mode-dot"></span>PRE-BAKED MODE</div>
+      </div>
+    </div>
+    <button class="btn-primary" id="landingContinue" style="width:100%">CONTINUE →</button>
+  </div>
+</div>
+
+<!-- ══ SCREEN 2: ACTION DOCTRINE ══ -->
+<div id="screen-doctrine" class="screen">
+  <div class="doctrine-inner">
+    <div class="doctrine-header">
+      <div class="tag tag-red" style="margin-bottom:12px">ACTION DOCTRINE</div>
+      <h2 class="doctrine-title">YOUR FOUR ACTIONS</h2>
+      <div class="doctrine-subtitle">UNDERSTAND EACH BEFORE THE SCENARIO BEGINS — CLICK ANY CARD FOR DETAIL</div>
+    </div>
+    <div class="doctrine-grid">
+      <div class="doctrine-card" style="--card-accent:#EF4444" onclick="openDoctrineModal('ELEVATE')">
+        <div class="doctrine-card-icon">⬆</div>
+        <div class="doctrine-card-name">ELEVATE</div>
+        <div class="doctrine-card-short">Immediate command awareness required</div>
+        <div class="doctrine-card-consequence">Use when the item may change battalion posture now.</div>
+        <div class="doctrine-card-more">TAP FOR DETAIL →</div>
+      </div>
+      <div class="doctrine-card" style="--card-accent:#F59E0B" onclick="openDoctrineModal('FLAG')">
+        <div class="doctrine-card-icon">⚑</div>
+        <div class="doctrine-card-name">FLAG</div>
+        <div class="doctrine-card-short">Active monitoring — not yet command-level</div>
+        <div class="doctrine-card-consequence">Use when the signal is concerning but not yet decisive.</div>
+        <div class="doctrine-card-more">TAP FOR DETAIL →</div>
+      </div>
+      <div class="doctrine-card" style="--card-accent:#06B6D4" onclick="openDoctrineModal('COLLECT')">
+        <div class="doctrine-card-icon">📡</div>
+        <div class="doctrine-card-name">COLLECT</div>
+        <div class="doctrine-card-short">Resolve uncertainty before acting</div>
+        <div class="doctrine-card-consequence">Use when more evidence could change whether you elevate.</div>
+        <div class="doctrine-card-more">TAP FOR DETAIL →</div>
+      </div>
+      <div class="doctrine-card" style="--card-accent:#6B7280" onclick="openDoctrineModal('ARCHIVE')">
+        <div class="doctrine-card-icon">◫</div>
+        <div class="doctrine-card-name">ARCHIVE</div>
+        <div class="doctrine-card-short">Log only — no active monitoring</div>
+        <div class="doctrine-card-consequence">Use when the item has no operational consequence right now.</div>
+        <div class="doctrine-card-more">TAP FOR DETAIL →</div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end">
+      <button class="btn-primary" onclick="goTo('scenario')">CONTINUE TO SCENARIO SELECT →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Doctrine Modal -->
+<div class="modal-backdrop" id="doctrineModal">
+  <div class="modal-box" id="doctrineModalBox">
+    <button class="modal-close" onclick="closeModal('doctrineModal')">CLOSE ✕</button>
+    <h3 id="modalTitle" style="color:#EF4444"></h3>
+    <div class="modal-section">
+      <div class="modal-section-label">When to use</div>
+      <div class="modal-section-text" id="modalWhen"></div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-label">Who receives it</div>
+      <div class="modal-section-text" id="modalWho"></div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-label">Workflow effect</div>
+      <div class="modal-section-text" id="modalEffect"></div>
+    </div>
+    <div class="modal-risk"><strong>⚠ Main risk:</strong> <span id="modalRisk"></span></div>
+  </div>
+</div>
+
+<!-- ══ SCREEN 3: SCENARIO SELECT ══ -->
+<div id="screen-scenario" class="screen">
+  <div class="scenario-inner">
+    <div style="margin-bottom:24px">
+      <div class="tag tag-blue" style="margin-bottom:12px">SCENARIO SELECT</div>
+      <h2 style="font-family:var(--font-display);font-size:42px;letter-spacing:4px;margin-bottom:6px">CHOOSE YOUR SCENARIO</h2>
+      <p style="font-size:13px;color:var(--txt2);line-height:1.6">Each scenario tests the same escalation judgment doctrine against a different intelligence environment. Select one to continue.</p>
+    </div>
+    <div class="scenario-grid">
+      <div class="scenario-card" id="sc-original" style="--sc-border:#3B82F6;--sc-color-a:#1D4ED8;--sc-color-b:#3B82F6" onclick="selectScenario('original')">
+        <div class="sc-icon">🌊</div>
+        <div class="sc-name">ORIGINAL</div>
+        <div class="sc-count">28 ITEMS</div>
+        <div class="sc-desc">Multi-domain hybrid threat — logistics pre-positioning, subversion, IO, conventional staging. The full original Grey Harbor scenario.</div>
+        <div class="sc-badge" style="background:rgba(59,130,246,.15);color:#3B82F6;border:1px solid rgba(59,130,246,.3)">HUMINT · SIGINT · IMINT · OSINT</div>
+      </div>
+      <div class="scenario-card" id="sc-cyber" style="--sc-border:#06B6D4;--sc-color-a:#0891B2;--sc-color-b:#06B6D4" onclick="selectScenario('cyber')">
+        <div class="sc-icon">⚡</div>
+        <div class="sc-name">CYBER</div>
+        <div class="sc-count">15 ITEMS</div>
+        <div class="sc-desc">Defensive cyber observations combined with external intelligence. A persistent adversary moves from probing to confirmed access to exfiltration.</div>
+        <div class="sc-badge" style="background:rgba(6,182,212,.15);color:#06B6D4;border:1px solid rgba(6,182,212,.3)">CYBER · SIGINT · HUMINT · OSINT</div>
+      </div>
+      <div class="scenario-card" id="sc-full" style="--sc-border:#8B5CF6;--sc-color-a:#7C3AED;--sc-color-b:#8B5CF6" onclick="selectScenario('full')">
+        <div class="sc-icon">🔱</div>
+        <div class="sc-name">FULL</div>
+        <div class="sc-count">43 ITEMS</div>
+        <div class="sc-desc">Complete scenario combining both modules. Multi-domain hybrid threat with a concurrent cyber intrusion campaign running in parallel.</div>
+        <div class="sc-badge" style="background:rgba(139,92,246,.15);color:#8B5CF6;border:1px solid rgba(139,92,246,.3)">ALL DISCIPLINES</div>
+      </div>
+    </div>
+    <button class="btn-primary" id="scenarioContinueBtn" disabled onclick="confirmScenario()">CONTINUE TO THEATER BRIEF →</button>
+  </div>
+</div>
+
+<!-- ══ SCREEN 4: THEATER BRIEF ══ -->
+<div id="screen-theater" class="screen">
+  <div class="theater-inner">
+    <div class="theater-header">
+      <div class="tag tag-amber" style="margin-bottom:10px">THEATER BRIEF</div>
+      <h2 class="theater-title">GREY HARBOR CORRIDOR</h2>
+      <div class="theater-sub">OPERATIONAL CONTEXT — READ BEFORE SCENARIO</div>
+    </div>
+    <div class="theater-grid">
+      <div class="theater-block">
+        <div class="theater-block-label">Area of Operations</div>
+        <div class="theater-block-text">Grey Harbor is a <strong>contested coastal corridor</strong> bordering adversary-controlled territory. The region contains a major logistics port, fuel depot, and key telecommunications infrastructure. Civilian and commercial activity overlaps with potential threat vectors throughout the corridor.</div>
+      </div>
+      <div class="theater-block">
+        <div class="theater-block-label">Friendly Mission</div>
+        <div class="theater-block-text">
+          <strong>Support host nation stability.</strong> Protect battalion headquarters and logistics operations. Prevent adversary hybrid escalation from reaching the threshold that would require conventional force response or emergency command action.
+        </div>
+      </div>
+      <div class="theater-block full">
+        <div class="theater-block-label">Adversary Pattern of Behavior — Escalation Phases</div>
+        <div class="theater-block-text">Historically, the adversary escalates in four phases:
+          <ul class="vuln-list" style="margin-top:6px">
+            <li><strong>Phase 1:</strong> Information operations and narrative shaping targeting local population</li>
+            <li><strong>Phase 2:</strong> Infrastructure disruption — cyber attacks, utility interference</li>
+            <li><strong>Phase 3:</strong> Covert staging and false-flag activity to create pretext</li>
+            <li><strong>Phase 4:</strong> Conventional force movement under cover of established pretext</li>
+          </ul>
+        </div>
+      </div>
+      <div class="theater-block">
+        <div class="theater-block-label">Recent Activity (Last 10 Days)</div>
+        <ul class="vuln-list">
+          <li>Increased coordinated online unrest narratives targeting dockworker communities</li>
+          <li>Minor cyber probing of port scheduling systems — no confirmed disruption yet</li>
+          <li>No confirmed conventional mobilization across northern border</li>
+        </ul>
+      </div>
+      <div class="theater-block">
+        <div class="theater-block-label">Key Vulnerabilities</div>
+        <ul class="vuln-list">
+          <li><strong>Larni fuel depot</strong> — primary logistics sustainment point</li>
+          <li><strong>Commercial port logistics hub</strong> — maritime authority scheduling system</li>
+          <li><strong>Telecommunications switching nodes</strong> — emergency comms dependency</li>
+          <li><strong>Water treatment facility</strong> — civilian mass-casualty exposure</li>
+          <li><strong>Battalion HQ perimeter</strong> — exposed sight lines from residential buildings</li>
+        </ul>
+      </div>
+      <div class="theater-block">
+        <div class="theater-block-label">Baseline Conditions</div>
+        <div class="theater-block-text">Commercial traffic typically operates <strong>0600–1800L</strong>. <strong>Nighttime military logistics activity is irregular</strong> — any confirmed nighttime cargo movement at depots is anomalous. No recent history of conventional staging in this corridor. Checkpoint Delta is the primary northern crossing; staffing gaps documented during weekend rotations.</div>
+      </div>
+    </div>
+    <div id="theaterContinueWrap" style="display:flex;justify-content:flex-end">
+      <button class="btn-primary" onclick="goTo('context')">CONTINUE →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCREEN 4: CONTEXT INQUIRY ══ -->
+<div id="screen-context" class="screen">
+  <div class="context-inner">
+    <div class="context-header">
+      <div class="tag tag-blue" style="margin-bottom:10px">CONTEXT INQUIRY</div>
+      <h2 class="context-title">ONE QUESTION BEFORE YOU BEGIN</h2>
+      <p class="context-sub">Before the intelligence feed begins, you may ask one question about the operational environment. Choose carefully — the quality of your question reflects your analytical instincts.</p>
+    </div>
+    <div class="context-instruction">Select exactly one question. Your choice and its answer will inform how you interpret items in the scenario.</div>
+    <div class="context-questions" id="contextQuestions"></div>
+    <div id="contextAnswer" style="display:none"></div>
+    <button class="btn-primary" id="contextBeginBtn" disabled onclick="beginScenario()" style="width:100%">BEGIN SCENARIO →</button>
+  </div>
+</div>
+
+<!-- ══ SCREEN 5: MAIN SCENARIO ══ -->
+<div id="screen-main" class="screen">
+  <div class="main-left" id="mainLeft">
+    <!-- agents rendered here -->
+  </div>
+  <div class="main-center">
+    <div class="main-center-inner" id="mainCenter">
+      <!-- intel + actions rendered here -->
+    </div>
+  </div>
+  <div class="main-right" id="mainRight">
+    <!-- stats rendered here -->
+  </div>
+</div>
+
+<!-- ══ SCREEN 6: SUMMARY ══ -->
+<div id="screen-summary" class="screen">
+  <div class="summary-inner" id="summaryInner">
+    <!-- rendered dynamically -->
+  </div>
+</div>
+
+</div><!-- #app -->
+<script>
+// ════════════════════════════════════════════════════════════════════
+// GREY HARBOR INTELLIGENCE TRAINING SIMULATOR — v2
+// ════════════════════════════════════════════════════════════════════
+
+// ── TYPE / RELIABILITY MAPS ──────────────────────────────────────────
+const TYPE_COLORS = {
+  HUMINT:{bg:"#92400E",text:"#FDE68A"},
+  SIGINT:{bg:"#1E3A5F",text:"#93C5FD"},
+  IMINT:{bg:"#14532D",text:"#86EFAC"},
+  OSINT:{bg:"#44403C",text:"#D6D3D1"},
+  CYBER:{bg:"#7F1D1D",text:"#FCA5A5"}
+};
+const REL_COLORS = {High:"#10B981",Credible:"#10B981",Med:"#F59E0B",Low:"#EF4444",Routine:"#6B7280",Unverified:"#EF4444"};
+const RESULT_COLORS = {ideal:"#10B981",acceptable:"#F59E0B",incorrect:"#EF4444"};
+const RESULT_LABELS = {ideal:"CORRECT",acceptable:"ACCEPTABLE",incorrect:"INCORRECT"};
+
+// ── ACTION DEFINITIONS ───────────────────────────────────────────────
+const ACTIONS = [
+  {id:"ELEVATE", label:"Elevate", icon:"⬆", color:"#EF4444", desc:"Immediate command awareness"},
+  {id:"FLAG",    label:"Flag",    icon:"⚑", color:"#F59E0B", desc:"Active monitoring"},
+  {id:"COLLECT", label:"Collect", icon:"📡",color:"#06B6D4", desc:"Resolve uncertainty"},
+  {id:"ARCHIVE", label:"Archive", icon:"◫", color:"#6B7280", desc:"Log only"},
+];
+
+// ── DOCTRINE DETAIL DATA ─────────────────────────────────────────────
+const DOCTRINE_DETAIL = {
+  ELEVATE:{
+    color:"#EF4444",
+    when:"The item meets or clearly approaches a CCIR threshold — credible threat to friendly forces, change in adversary posture, or a commander decision point. Elevation is the correct action when hesitation has operational cost.",
+    who:"Commander + Ops Cell. Enters the escalation channel immediately.",
+    effect:"Item reaches the commander's awareness. May trigger force protection measures, posture change, or higher HQ notification.",
+    risk:"Overuse creates alert fatigue. If every item elevates, no item elevates. Reserve for threshold-crossing items."
+  },
+  FLAG:{
+    color:"#F59E0B",
+    when:"The signal is concerning but single-source, ambiguous, or not yet at threshold. The item warrants active tracking — not immediate command awareness. Use when you need more context before you can commit.",
+    who:"Watch Queue. Actively monitored for corroboration or escalation.",
+    effect:"Item enters the watch queue and may resurface if corroborated by later reporting. Analyst remains accountable for the thread.",
+    risk:"Over-flagging clutters monitoring bandwidth. Flag should mean 'I am watching this' — not 'I am unsure what to do.'"
+  },
+  COLLECT:{
+    color:"#06B6D4",
+    when:"A specific, resolvable uncertainty materially affects whether you should elevate. Collection is only justified when the answer could change your threshold assessment. If the item already clearly meets or clearly fails threshold, collecting wastes assets.",
+    who:"ISR / follow-up collection workflow. Prompts a constrained collection choice.",
+    effect:"Triggers a targeted collection question with method selection. Result will clarify — or fail to clarify — the escalation threshold.",
+    risk:"Collecting on low-leverage questions wastes scarce ISR attention. Ask: would the answer change my decision? If no, archive or flag instead."
+  },
+  ARCHIVE:{
+    color:"#6B7280",
+    when:"The item has no current operational consequence: routine baseline, low-confidence noise, or content that contradicts its own claim (e.g., recycled imagery, vague secondhand report). Archived items are logged but not actively monitored.",
+    who:"Passive log. No automatic resurfacing.",
+    effect:"Item stored for record. Does not enter command channel or watch queue. May be referenced later but analyst is not tracking it.",
+    risk:"Missing weak early signals. Some items that look like noise are early-phase enabling indicators. Know the difference between noise and low-signal."
+  }
+};
+
+// ── SCORING CATEGORIES (3 in v2) ─────────────────────────────────────
+const SCORING_CATS = [
+  {id:"ESCALATION",  label:"Escalation Judgment", icon:"⬆", items:[9,10,12,13,14,17,19,20,21,22,23,24,25,27,28,34,37,38,41,42], thresholds:{bronze:0.55,silver:0.73,gold:0.91}},
+  {id:"SIGNAL",      label:"Signal Discipline",   icon:"◈", items:[2,4,5,6,8,15,23,30,31,40],                                    thresholds:{bronze:0.5,silver:0.75,gold:1.0}},
+  {id:"COLLECTION",  label:"Collection Discipline",icon:"📡",items:[1,3,7,11,16,18,26,29,32,39],                                  thresholds:{bronze:0.43,silver:0.71,gold:1.0}},
+];
+
+// ── INTEL ITEMS — ALL 28, v2 ACTION SCHEMA ───────────────────────────
+const ITEMS = [
+{index:1,item_id:"GH-HUM-014",type:"HUMINT",reliability:"Credible",timestamp:"0730",
+ summary:"Unidentified trucks unloading long, wooden, sealed crates at a disused fuel depot east of Larni at night.",
+ v2_ideal:"FLAG",v2_acceptable:["COLLECT"],
+ collection_enabled:true,
+ collection_options:[
+   {id:"baseline_abnormality",label:"Is nighttime cargo activity at this depot abnormal?",leverage:"high"},
+   {id:"source_credibility",label:"Can the source's account be corroborated?",leverage:"low"}
+ ],
+ collection_methods:["IMINT","HUMINT","SIGINT","OSINT"],
+ collection_outcomes:{
+   baseline_abnormality:{best_method:"IMINT",outcome_type:"confirmatory",result_text:"IMINT coverage of depot shows zero commercial activity in prior 90 days. Nighttime offloading with no manifests is anomalous.",threshold_effect:"approaching"},
+   source_credibility:{best_method:"HUMINT",outcome_type:"low_leverage",result_text:"Source restates account with no new verifiable detail. Credibility unchanged.",threshold_effect:"unchanged"}
+ },
+ watch_followup:{status:"can_be_validated",linked_future_items:["GH-SIG-0876","GH-HUM-016"],coach_text_on_validation:"Earlier monitoring was justified. Later reporting on cargo and checkpoint activity strengthened this logistics thread."},
+ threat_track:"LOGISTICS",ccir_match:["PIR-5"],automation_bias_test:false,
+ teaching_point:"First reports in a new situation should be flagged, not dismissed. Absence of corroboration is not evidence of irrelevance.",
+ feedback:{ELEVATE:"Elevating a single uncorroborated HUMINT report risks alert fatigue. The item is concerning but not yet threshold-crossing — flag it and watch for corroboration.",FLAG:"Correct. Credible source, concerning indicators, but single-source and unverified. Active monitoring is the right call.",COLLECT:"Acceptable. Targeting the baseline uncertainty via IMINT could sharpen your threshold assessment before committing.",ARCHIVE:"Dangerous. A credible-rated HUMINT report about unusual nighttime activity at a logistics site should not be passively logged."}
+},
+{index:2,item_id:"GH-SOC-221",type:"OSINT",reliability:"Low",timestamp:"1615",
+ summary:"Social media post claiming military equipment arrival; blurred photo likely recycled from prior year.",
+ v2_ideal:"ARCHIVE",v2_acceptable:["FLAG"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"DECEPTION",ccir_match:[],automation_bias_test:false,
+ teaching_point:"Not all information that touches your topic is signal. Recycled imagery is a common disinformation tactic — log it and move on.",
+ feedback:{ELEVATE:"Elevating low-confidence OSINT with confirmed recycled imagery erodes commander trust and wastes bandwidth.",FLAG:"Generous but not indefensible. The recycled photo largely makes this assessable as noise — archiving is cleaner.",COLLECT:"No specifics to collect against. Recycled imagery doesn't warrant ISR tasking.",ARCHIVE:"Correct. Low confidence, recycled imagery, no verifiable new information."}
+},
+{index:3,item_id:"GH-SIG-0876",type:"SIGINT",reliability:"High",timestamp:"2300",
+ summary:"Intercepted comms refer to 'cargo ahead of schedule' and 'temporary tanks'; phrasing is highly ambiguous.",
+ v2_ideal:"FLAG",v2_acceptable:["COLLECT"],
+ collection_enabled:true,
+ collection_options:[
+   {id:"tank_meaning",label:"Does 'temporary tanks' refer to fuel storage or armor?",leverage:"high"},
+   {id:"comms_origin",label:"Can the comms origin be geolocated?",leverage:"medium"}
+ ],
+ collection_methods:["IMINT","SIGINT","HUMINT"],
+ collection_outcomes:{
+   tank_meaning:{best_method:"IMINT",outcome_type:"ambiguous",result_text:"IMINT of northern staging area shows heat signatures consistent with either fuel berm or vehicle engines. Ambiguity narrows but does not resolve.",threshold_effect:"approaching"},
+   comms_origin:{best_method:"SIGINT",outcome_type:"confirmatory",result_text:"Signal origin geolocated to northern border region — consistent with adversary logistics node.",threshold_effect:"approaching"}
+ },
+ watch_followup:{status:"can_be_validated",linked_future_items:["GH-IMN-005"],coach_text_on_validation:"GH-IMN-005 later confirmed: 'temporary tanks' referred to actual T-72 armor. Your earlier flag was justified."},
+ threat_track:"LOGISTICS",ccir_match:["PIR-2","PIR-3"],automation_bias_test:true,
+ bias_wrong_action:"ARCHIVE",
+ bias_rationale:"High-confidence SIGINT but phrasing is too ambiguous to act on — 'cargo ahead of schedule' and 'temporary tanks' have routine commercial explanations. No threat content confirmed. Recommend archival until specifics emerge.",
+ teaching_point:"High-confidence SIGINT with ambiguous phrasing should be flagged and cross-referenced. 'Temporary tanks' becomes unambiguous when imagery confirms armor.",
+ feedback:{ELEVATE:"Content is too ambiguous to elevate. 'Temporary tanks' could be fuel storage. Flag and monitor until imagery confirms.",FLAG:"Correct. High-confidence source but ambiguous content — active monitoring keeps this thread alive for corroboration.",COLLECT:"Acceptable. The ambiguity in 'tanks' is a high-leverage uncertainty that collection could resolve.",ARCHIVE:"Critical error. High-confidence SIGINT with plausible threat content should not be passively logged."}
+},
+{index:4,item_id:"GH-IMN-003",type:"IMINT",reliability:"Routine",timestamp:"0440",
+ summary:"Industrial zone monitoring shows routine vehicle presence; security perimeter remains unchanged.",
+ v2_ideal:"ARCHIVE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:null,ccir_match:[],automation_bias_test:false,
+ teaching_point:"Baseline reports are anchors for future change detection — but they should never reach the commander. Archive and use as reference.",
+ feedback:{ELEVATE:"Nothing actionable. Elevating routine baselines erodes signal-to-noise and wastes command bandwidth.",FLAG:"Not warranted. This is clearly routine — active monitoring adds no value here.",COLLECT:"Wasteful. No change from baseline means no uncertainty worth resolving.",ARCHIVE:"Correct. Log the baseline. If the zone changes later, you'll have a reference point."}
+},
+{index:5,item_id:"GH-HUM-015",type:"HUMINT",reliability:"Unverified",timestamp:"0615",
+ summary:"Secondhand accounts of weapons distribution via a social media group; details remain vague.",
+ v2_ideal:"ARCHIVE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"DECEPTION",ccir_match:[],automation_bias_test:false,
+ teaching_point:"Vague secondhand reports amplify noise. Multiple red flags here: unverified source, secondhand, no specifics, social media channel.",
+ feedback:{ELEVATE:"Wastes commander bandwidth. Unverified, secondhand, vague — none of the threshold criteria are met.",FLAG:"Overly generous. This doesn't warrant active monitoring resources.",COLLECT:"No specifics to collect against. Vague secondhand reports don't give collection a target.",ARCHIVE:"Correct. Multiple red flags — unverified source, secondhand, no actionable detail."}
+},
+{index:6,item_id:"GH-OSI-222",type:"OSINT",reliability:"Low",timestamp:"2215",
+ summary:"News reports indicate backlogs in inspections and personnel shortages for the upcoming weekend.",
+ v2_ideal:"ARCHIVE",v2_acceptable:["FLAG"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"LOGISTICS",ccir_match:["PIR-5"],automation_bias_test:true,
+ bias_wrong_action:"ARCHIVE",
+ bias_rationale:"Low-confidence OSINT about routine administrative issues. Staffing shortages and inspection backlogs are host nation infrastructure problems, not intelligence indicators. No threat content. Recommend archival as noise.",
+ teaching_point:"Enabling conditions matter. Inspection backlogs + nighttime cargo deliveries = opportunity exploitation. Don't dismiss contextual intelligence.",
+ feedback:{ELEVATE:"Infrastructure conditions, not a direct threat indicator. Elevation is premature.",FLAG:"Acceptable. Recognizing enabling conditions — inspection gaps create exploitation windows — shows good situational awareness.",COLLECT:"News reports don't warrant ISR tasking.",ARCHIVE:"Risky. Staffing shortages at inspection points create opportunity windows for adversary logistics. This item gains meaning when read alongside GH-HUM-014."}
+},
+{index:7,item_id:"GH-HUM-016",type:"HUMINT",reliability:"High",timestamp:"1030",
+ summary:"Checkpoint Delta reports three vehicles passed through with allegedly approved, but suspicious, credentials.",
+ v2_ideal:"FLAG",v2_acceptable:["ELEVATE"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"can_be_validated",linked_future_items:["GH-SIG-0901"],coach_text_on_validation:"This logistics thread eventually connects to the false flag operation. Your earlier monitoring was analytically sound."},
+ threat_track:"LOGISTICS",ccir_match:["PIR-2","PIR-5"],automation_bias_test:true,
+ bias_wrong_action:"FLAG",
+ bias_rationale:"Medium-priority HUMINT. Suspicious credentials could have multiple explanations — administrative error, expired permits, or forgery. Without confirmation of what the vehicles were carrying, flag as ambiguous and await clarification.",
+ teaching_point:"Pattern recognition: nighttime deliveries → cargo comms → suspicious checkpoint activity. Three data points is a thread, not a coincidence.",
+ feedback:{ELEVATE:"Acceptable. This is the third indicator in the logistics pattern — elevation is defensible, though the thread is not yet command-level clear.",FLAG:"Correct. Third data point in the logistics thread. Active monitoring is warranted; command notification is premature without a clearer picture.",COLLECT:"Vehicles already passed the checkpoint — the collection opportunity has closed.",ARCHIVE:"Critical error. High-confidence HUMINT that is the third indicator in a developing logistics thread should not be passively logged."}
+},
+{index:8,item_id:"GH-FOR-233",type:"OSINT",reliability:"Med",timestamp:"1145",
+ summary:"Forum posts discuss 'foreign advisors' at the shipyard; imagery shows no permanent infrastructure change.",
+ v2_ideal:"ARCHIVE",v2_acceptable:["FLAG"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"SUBVERSION",ccir_match:[],automation_bias_test:false,
+ teaching_point:"When sensor data contradicts an open-source claim, that contradiction is itself data. The absence of infrastructure change reduces the claim's credibility.",
+ feedback:{ELEVATE:"Doesn't meet elevation criteria. Imagery directly contradicts the forum claim.",FLAG:"Acceptable. The shipyard theme is worth noting, but imagery-contradicted forum posts are low-priority.",COLLECT:"Low priority given the imagery contradiction.",ARCHIVE:"Correct. Imagery contradicts the claim — this is assessable noise. Note the topic, log it, move on."}
+},
+{index:9,item_id:"GH-SIG-0901",type:"SIGINT",reliability:"High",timestamp:"0130",
+ summary:"SIGINT/LLVI: Intercepted enemy agents discussing 'igniting the match' at a harbor workers' rally. Indicates a false flag plan.",
+ v2_ideal:"ELEVATE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"SUBVERSION",ccir_match:["PIR-1","PIR-2","PIR-4"],automation_bias_test:false,
+ teaching_point:"Some items demand immediate elevation. High-confidence SIGINT indicating a specific operation at a named location meets every CCIR. There is no threshold ambiguity here.",
+ feedback:{ELEVATE:"Correct — and urgent. High-confidence SIGINT indicating a named false flag operation at a specific venue. This is command-level immediately.",FLAG:"Not sufficient. This item meets PIR-1, PIR-2, and PIR-4. Monitoring is not a substitute for elevation when the threshold is clearly crossed.",COLLECT:"Collect nothing. Elevate this now. Collection would delay command awareness with no threshold benefit.",ARCHIVE:"Catastrophic error. High-confidence SIGINT on a named adversary operation against friendly-adjacent forces."}
+},
+{index:10,item_id:"GH-CYB-042",type:"CYBER",reliability:"High",timestamp:"0315",
+ summary:"Cyber: DDoS attack on host nation maritime authority; port scheduling software is currently offline.",
+ v2_ideal:"ELEVATE",v2_acceptable:["FLAG"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"CYBER",ccir_match:["PIR-2","PIR-4","PIR-5"],automation_bias_test:false,
+ teaching_point:"Cyber attacks on critical infrastructure are phase-transition indicators. Port scheduling offline = adversary shaping the battlespace for what comes next.",
+ feedback:{ELEVATE:"Correct. A confirmed DDoS on maritime authority during a period of elevated adversary activity is a phase-transition indicator. Commander needs to see this.",FLAG:"Defensible if you're still building the picture, but this is a confirmed cyber attack on operational infrastructure. Elevation is warranted.",COLLECT:"Nothing to collect here — the attack is confirmed. The question is what it precedes, not whether it happened.",ARCHIVE:"Critical error. Confirmed cyber attack on port infrastructure during elevated threat period."}
+},
+{index:11,item_id:"GH-HUM-017",type:"HUMINT",reliability:"Med",timestamp:"0500",
+ summary:"HUMINT: Source reports 'Grey Harbor Youth' received cash and placards for 'force removal' protests from an unknown courier.",
+ v2_ideal:"FLAG",v2_acceptable:["ELEVATE"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"can_be_validated",linked_future_items:["GH-OSI-230","GH-HUM-018"],coach_text_on_validation:"The subversion thread matured significantly. Your earlier monitoring of the protest mobilization was analytically correct."},
+ threat_track:"SUBVERSION",ccir_match:["PIR-2","PIR-3"],automation_bias_test:true,
+ bias_wrong_action:"ARCHIVE",
+ bias_rationale:"Medium-confidence HUMINT on protest activity. Paid demonstrations are endemic in the region and do not constitute an intelligence indicator. No confirmed adversary nexus. Recommend archival as background political noise.",
+ teaching_point:"Corroboration requires convergent indicators, not identical wording. Paid protest coordination + earlier false flag intercept = same operation, two disciplines.",
+ feedback:{ELEVATE:"Acceptable. Combined with GH-SIG-0901, this corroborates the subversion operation — elevation is defensible.",FLAG:"Correct. This item adds a second discipline to the subversion thread. Flag it — the combined confidence now exceeds either item alone.",COLLECT:"The question isn't what to collect — it's whether the pattern meets threshold. It does at FLAG, probably at ELEVATE.",ARCHIVE:"Dangerous. A medium-confidence HUMINT that corroborates a prior SIGINT intercept about an adversary operation should not be passively logged."}
+},
+{index:12,item_id:"GH-SIG-0905",type:"SIGINT",reliability:"High",timestamp:"0845",
+ summary:"SIGINT/LLVI: Intercepted details of a kidnap plot targeting a friendly logistics officer at the 'Blue Anchor' cafe.",
+ v2_ideal:"ELEVATE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"FORCE_PROTECTION",ccir_match:["PIR-1","PIR-4"],automation_bias_test:false,
+ teaching_point:"Specific threats to friendly forces — named individual, named location, named method — always elevate immediately. No threshold analysis required.",
+ feedback:{ELEVATE:"Correct — and time-critical. Named target, named location, high-confidence SIGINT. This is a force protection emergency.",FLAG:"Not acceptable. A specific, high-confidence threat to a named friendly individual requires immediate command awareness, not a watch queue.",COLLECT:"No time to collect. Someone may be at the Blue Anchor right now.",ARCHIVE:"Unconscionable. High-confidence threat to a specific friendly individual."}
+},
+{index:13,item_id:"GH-IMN-005",type:"IMINT",reliability:"High",timestamp:"1000",
+ summary:"IMINT: Satellite imagery identifies ~24 T-72 variants under camo netting 15km across the northern border.",
+ v2_ideal:"ELEVATE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"CONVENTIONAL",ccir_match:["PIR-1","PIR-2","PIR-4"],automation_bias_test:false,
+ teaching_point:"This resolves earlier ambiguity. GH-SIG-0876's 'temporary tanks' is no longer ambiguous — they are actual T-72 armor. High-confidence imagery of 24 tanks 15km from your position is unambiguous.",
+ feedback:{ELEVATE:"Correct. Unambiguous conventional threat 15km across the border. Command needs this immediately.",FLAG:"Not sufficient. Twenty-four T-72s under camo netting 15km from your position is not a 'watch queue' item.",COLLECT:"Nothing to collect. High-confidence satellite imagery is already the most direct evidence available.",ARCHIVE:"Catastrophic. Twenty-four tanks 15km from battalion AO."}
+},
+{index:14,item_id:"GH-SIG-0910",type:"SIGINT",reliability:"Med",timestamp:"1130",
+ summary:"SIGINT: Intercept of local police frequencies; unknown tactical teams in civilian clothes setting up hides near Ministry of Justice.",
+ v2_ideal:"ELEVATE",v2_acceptable:["FLAG"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"SUBVERSION",ccir_match:["PIR-1","PIR-2","PIR-5"],automation_bias_test:false,
+ teaching_point:"Tactical teams in civilian clothes near a government building during a period of active adversary subversion operations is a direct threat indicator — not an ambiguous one.",
+ feedback:{ELEVATE:"Correct. Potential seizure indicator. Unknown tactical elements near a government ministry during an active adversary campaign.",FLAG:"Defensible, but this item — combined with SIG-0901 and HUM-017 — is building toward command-level urgency. Elevation is the stronger call.",COLLECT:"Better to elevate and task collection concurrently. Command awareness cannot wait for collection results here.",ARCHIVE:"Dangerous. Tactical teams near a government target during an active subversion campaign."}
+},
+{index:15,item_id:"GH-OSI-230",type:"OSINT",reliability:"Low",timestamp:"1215",
+ summary:"OSINT: Deepfake video of host nation soldiers assaulting a civilian circulating to incite local riots.",
+ v2_ideal:"FLAG",v2_acceptable:["ELEVATE"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"can_be_validated",linked_future_items:["GH-HUM-018"],coach_text_on_validation:"The IO campaign deployed a deepfake then followed with professional agitators. Your earlier flag of the information operation was analytically sound."},
+ threat_track:"DECEPTION",ccir_match:["PIR-2","PIR-5"],automation_bias_test:true,
+ bias_wrong_action:"ARCHIVE",
+ bias_rationale:"Screening identifies fabricated content (deepfake). Low confidence OSINT with confirmed false content. No intelligence value in disinformation. Recommend archival as noise.",
+ teaching_point:"The content is false, but the deployment of a deepfake is a confirmed hostile act. You are watching an information operation, not consuming the disinformation.",
+ feedback:{ELEVATE:"Acceptable. The deployment of an IO weapon confirms an active adversary information campaign — elevation is defensible.",FLAG:"Correct. The video is fake, but the operation is real. This is part of the subversion thread — active monitoring is warranted.",COLLECT:"The IO weapon is already deployed. The urgent question is what it precedes, not what it contains.",ARCHIVE:"Dangerous. The content is fabricated, but the deployment is a confirmed hostile act. You are not being deceived by the deepfake — you are watching an adversary IO weapon being used."}
+},
+{index:16,item_id:"GH-HUM-018",type:"HUMINT",reliability:"High",timestamp:"1400",
+ summary:"HUMINT: Informant identifies three non-local 'professional agitators' arriving via small boat to lead dockworker strikes.",
+ v2_ideal:"FLAG",v2_acceptable:["ELEVATE"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"SUBVERSION",ccir_match:["PIR-1","PIR-2","PIR-3"],automation_bias_test:false,
+ teaching_point:"Threat threads mature through phases. Professional agitators arriving by covert means to a port city during active subversion operations confirms the operational phase is advancing.",
+ feedback:{ELEVATE:"Acceptable. This item confirms the subversion thread is now in execution phase — professional operatives have arrived.",FLAG:"Correct. High-confidence confirmation of the subversion thread. Active monitoring and integration with prior items is the right call.",COLLECT:"Correlation and escalation — not collection — is the primary need here.",ARCHIVE:"Serious error. High-confidence confirmation of adversary operatives arriving to execute a subversion operation."}
+},
+{index:17,item_id:"GH-SIG-0912",type:"SIGINT",reliability:"High",timestamp:"1545",
+ summary:"SIGINT/LLVI: Enemy intelligence discussing 'The Green Light' — synchronized sabotage of power substations 4 and 7.",
+ v2_ideal:"ELEVATE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"SABOTAGE",ccir_match:["PIR-1","PIR-2","PIR-4"],automation_bias_test:false,
+ teaching_point:"Code words like 'The Green Light' signal transition from planning to execution. Named substations, synchronized timing, high-confidence SIGINT — this is a command-level item.",
+ feedback:{ELEVATE:"Correct — immediate. Named sabotage targets, execution-phase code word, high-confidence SIGINT. No threshold ambiguity.",FLAG:"Not sufficient. 'The Green Light' is an execution trigger, not a planning discussion. Command needs this now.",COLLECT:"No time. This is an execution-phase adversary communication. Elevate immediately.",ARCHIVE:"Catastrophic. High-confidence SIGINT on imminent sabotage of named critical infrastructure."}
+},
+{index:18,item_id:"GH-IMN-007",type:"IMINT",reliability:"Med",timestamp:"1630",
+ summary:"IMINT: UAV feed shows 4x transport helicopters conducting non-notified low-altitude drills in the western 'Dead Zone.'",
+ v2_ideal:"FLAG",v2_acceptable:["ELEVATE"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"can_be_validated",linked_future_items:["GH-SIG-0915","GH-IMN-009"],coach_text_on_validation:"Helicopter activity in the Dead Zone was precursor to conventional assault staging. Your earlier flag was correct."},
+ threat_track:"CONVENTIONAL",ccir_match:["PIR-2","PIR-5"],automation_bias_test:true,
+ bias_wrong_action:"ARCHIVE",
+ bias_rationale:"Medium-confidence IMINT of helicopter activity in a designated exercise zone. Non-notified low-altitude drills are consistent with routine training activity. No confirmed coordination with ground forces. Recommend archival pending corroboration.",
+ teaching_point:"Combined arms indicator: transport helicopters conducting non-notified drills near a border with 24 confirmed tanks is not a coincidence. Flag and connect to the conventional thread.",
+ feedback:{ELEVATE:"Acceptable. Combined with GH-IMN-005 (T-72s), this is the combined arms picture emerging — elevation is defensible.",FLAG:"Correct. Non-notified helicopter activity adjacent to armor staging warrants active monitoring as part of the conventional thread.",COLLECT:"Nothing specific to collect — the observation is the data. Flag and integrate.",ARCHIVE:"Unacceptable. Transport helicopters near a border where you have confirmed armor staging should not be passively logged."}
+},
+{index:19,item_id:"GH-SIG-0915",type:"SIGINT",reliability:"Med",timestamp:"1800",
+ summary:"SIGINT: Enemy signals shift to new encryption protocols for border units; historically precedes offensive maneuvers.",
+ v2_ideal:"ELEVATE",v2_acceptable:["FLAG"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"CONVENTIONAL",ccir_match:["PIR-2","PIR-4"],automation_bias_test:false,
+ teaching_point:"Historical pattern indicators gain operational weight from context. Encryption shift alone might be a drill. Encryption shift + 24 tanks + transport helicopters = pre-offensive posture.",
+ feedback:{ELEVATE:"Correct. Pattern indicator with strong contextual confirmation from prior items. Commander needs the full picture.",FLAG:"Defensible as a pattern piece, but the cumulative weight of GH-IMN-005, GH-IMN-007, and now this encryption shift argues for elevation.",COLLECT:"The pattern is established. The question is escalation, not evidence.",ARCHIVE:"Dangerous. Encryption protocol shift — historically associated with offensive maneuvers — during an active conventional buildup."}
+},
+{index:20,item_id:"GH-CYB-045",type:"CYBER",reliability:"High",timestamp:"1915",
+ summary:"Cyber: Ransomware attack confirmed on local cellular provider; emergency comms disrupted in Grey Harbor.",
+ v2_ideal:"ELEVATE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"CYBER",ccir_match:["PIR-1","PIR-2","PIR-4"],automation_bias_test:false,
+ teaching_point:"Systematic infrastructure targeting sequence: port → telecom → power (imminent). Each attack degrades a different defensive or coordination layer.",
+ feedback:{ELEVATE:"Correct — immediate. Emergency comms disruption is a direct threat to friendly force coordination. Third cyber attack in the sequence.",FLAG:"Not sufficient. Emergency comms are down. This is a confirmed PIR-1 condition.",COLLECT:"Nothing to collect. The attack is confirmed. Elevate and initiate contingency comms protocols.",ARCHIVE:"Catastrophic. Confirmed ransomware attack taking down emergency communications."}
+},
+{index:21,item_id:"GH-HUM-019",type:"HUMINT",reliability:"Med",timestamp:"2030",
+ summary:"HUMINT: Civilians report men burying crates near main highway; suspected IED placement on friendly reinforcement routes.",
+ v2_ideal:"ELEVATE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"FORCE_PROTECTION",ccir_match:["PIR-1","PIR-4"],automation_bias_test:false,
+ teaching_point:"Asymmetric cost calculus: false positive wastes a patrol. False negative kills soldiers on the reinforcement route. The asymmetry demands elevation.",
+ feedback:{ELEVATE:"Correct. Suspected IED placement on reinforcement routes during an active threat period. Asymmetric cost demands elevation.",FLAG:"Not sufficient. If the IEDs are real and the convoy moves, soldiers die. Elevation is required when force protection cost is asymmetric.",COLLECT:"Collection takes time. Suspected IED on a route that may be used now requires immediate command awareness.",ARCHIVE:"Protective failure. Suspected IED emplacement is a force protection emergency."}
+},
+{index:22,item_id:"GH-SIG-0918",type:"SIGINT",reliability:"High",timestamp:"2100",
+ summary:"SIGINT/LLVI: Intercept: 'The weather is favorable for the harvest.' Likely activation of sleeper cells in the capital.",
+ v2_ideal:"ELEVATE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"SUBVERSION",ccir_match:["PIR-1","PIR-2","PIR-4"],automation_bias_test:false,
+ teaching_point:"Third activation code in the sequence. Pattern: 'igniting the match' → 'The Green Light' → 'weather favorable for the harvest.' Each code triggered a different operational layer. Synchronized offensive is launching.",
+ feedback:{ELEVATE:"Correct. Third activation code confirms synchronized offensive launch. Command needs this immediately.",FLAG:"Not acceptable. A third activation code in a known series is not an ambiguous monitoring item.",COLLECT:"Nothing to collect. The operation is executing. Elevate.",ARCHIVE:"Catastrophic. Third synchronization signal in an active adversary multi-vector offensive."}
+},
+{index:23,item_id:"GH-FOR-240",type:"OSINT",reliability:"High",timestamp:"2200",
+ summary:"OSINT: Enemy state media releases manifesto claiming host nation sovereignty is compromised; creates pretext for invasion.",
+ v2_ideal:"ELEVATE",v2_acceptable:["FLAG"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"DECEPTION",ccir_match:["PIR-2","PIR-4"],automation_bias_test:false,
+ teaching_point:"State media creating a legal/political pretext for invasion while conventional forces are staging is a synchronized political-military clock. This is the IO cover for what the armor and helicopters are about to do.",
+ feedback:{ELEVATE:"Correct. State media pretext publication while conventional forces are staged = synchronized political-military clock. Command needs this immediately.",FLAG:"Defensible as part of the IO picture, but given what we know about the conventional buildup, this is command-level.",COLLECT:"The message is already published. The question is command awareness.",ARCHIVE:"Catastrophic. Enemy state media publishing invasion pretext while 24 tanks sit 15km across the border."}
+},
+{index:24,item_id:"GH-SIG-0920",type:"SIGINT",reliability:"Med",timestamp:"2245",
+ summary:"SIGINT: Burst transmission from a residential apartment overlooking friendly HQ; suspected spotter for special ops.",
+ v2_ideal:"ELEVATE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"FORCE_PROTECTION",ccir_match:["PIR-1","PIR-4"],automation_bias_test:false,
+ teaching_point:"Threats to your headquarters are always elevated. A spotter with line-of-sight on battalion HQ is a direct, immediate force protection emergency.",
+ feedback:{ELEVATE:"Correct. Suspected spotter overlooking battalion HQ. Direct force protection threat — command awareness is immediate.",FLAG:"Not sufficient. A potential spotter on your headquarters is not a watch queue item. It requires immediate response.",COLLECT:"Elevate first. Force protection response cannot wait for collection.",ARCHIVE:"Indefensible. Suspected surveillance of battalion HQ."}
+},
+{index:25,item_id:"GH-IMN-009",type:"IMINT",reliability:"High",timestamp:"2315",
+ summary:"IMINT: Thermal imagery shows heavy engine heat signatures at 4th Motorized Brigade staging area; vehicles idling.",
+ v2_ideal:"ELEVATE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"CONVENTIONAL",ccir_match:["PIR-1","PIR-2","PIR-4"],automation_bias_test:false,
+ teaching_point:"Staged vehicles with engines idling is the final pre-movement indicator. Combined with encryption changes and helicopter staging, this is imminent offensive action.",
+ feedback:{ELEVATE:"Correct — final pre-movement indicator. Thermal confirms vehicles are running. Combine with encryption shift and helicopter staging: imminent movement.",FLAG:"No time. Vehicles idling in a staging area means movement is minutes to hours away, not days.",COLLECT:"Nothing to collect. Thermal is already the most direct indicator available. Elevate.",ARCHIVE:"Highest-order failure. Thermal confirmation of imminent armored movement."}
+},
+{index:26,item_id:"GH-HUM-020",type:"HUMINT",reliability:"Med",timestamp:"0015",
+ summary:"HUMINT: Border guard reports 'unexplained lights' and drone swarms harassing outposts to test response times.",
+ v2_ideal:"FLAG",v2_acceptable:["ELEVATE"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"CONVENTIONAL",ccir_match:["PIR-1","PIR-2"],automation_bias_test:true,
+ bias_wrong_action:"ELEVATE",
+ bias_rationale:"Medium-confidence HUMINT of drone probing and unexplained lights at border outposts. Combined with confirmed armor staging and helicopter activity, this constitutes a direct threat indicator requiring immediate command awareness. Recommend elevation.",
+ teaching_point:"Pre-assault reconnaissance: drone probing maps defensive response times. This is the adversary taking the measure of your outposts before moving armor.",
+ feedback:{ELEVATE:"Acceptable. Drone probing of outpost response times immediately before suspected armor movement is a pre-assault indicator — elevation is defensible.",FLAG:"Correct. Drone harassment of outposts is consistent with pre-assault reconnaissance. Flag and integrate with the conventional thread.",COLLECT:"Nothing to collect — the probing is ongoing. Flag and escalate the conventional picture.",ARCHIVE:"Critical failure. Drone probing of defensive positions during an active conventional buildup is a pre-assault indicator."}
+},
+{index:27,item_id:"GH-SIG-0925",type:"SIGINT",reliability:"High",timestamp:"0100",
+ summary:"SIGINT/LLVI: Enemy confirmed delivery of 'chemical reagents' to Larni water treatment facility. Contamination threat.",
+ v2_ideal:"ELEVATE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"SABOTAGE",ccir_match:["PIR-1","PIR-4"],automation_bias_test:false,
+ teaching_point:"Mass casualty threats override all other priorities. Chemical contamination of a civilian water supply is an immediate command-level emergency regardless of scenario context.",
+ feedback:{ELEVATE:"Correct — highest priority. Confirmed delivery of chemical agents to civilian water infrastructure. Mass casualty threat requires immediate command and emergency response.",FLAG:"Not acceptable. A confirmed chemical threat to the water supply is not a monitoring item. This is a mass casualty emergency.",COLLECT:"No time to collect. Elevate and initiate emergency response protocols immediately.",ARCHIVE:"Criminally negligent. Confirmed chemical threat to civilian water infrastructure."}
+},
+{index:28,item_id:"GH-OSI-250",type:"OSINT",reliability:"Med",timestamp:"0230",
+ summary:"OSINT: Bot surge calling for a 'Day of Rage' at sunrise; coordinates match location of friendly barracks.",
+ v2_ideal:"ELEVATE",v2_acceptable:["FLAG"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"FORCE_PROTECTION",ccir_match:["PIR-1","PIR-4"],automation_bias_test:false,
+ teaching_point:"Final convergence: subversion + IO + conventional force synchronized. A bot surge targeting your barracks location at sunrise is the last piece of the operational picture.",
+ feedback:{ELEVATE:"Correct. Bot surge targeting friendly barracks at sunrise, four hours away. Final convergence of all threat threads.",FLAG:"Defensible as an IO element, but the coordinates target friendly barracks with a sunrise timeline. Elevation is warranted.",COLLECT:"Four hours to sunrise. Command needs this now — not after collection.",ARCHIVE:"Catastrophic. Coordinated bot surge targeting friendly barracks four hours before sunrise, during a full multi-vector adversary offensive."}
+},
+// ── CYBER MODULE ITEMS (GH-CYB-401 through GH-OSINT-415) ─────────────
+{index:29,item_id:"GH-CYB-401",type:"CYBER",reliability:"Med",timestamp:"0215",
+ summary:"CYBER: Network authentication logs show repeated failed login attempts against the coalition VPN gateway supporting battalion HQ and port logistics systems. Source IP range has not previously been observed in regional traffic.",
+ v2_ideal:"FLAG",v2_acceptable:["COLLECT"],
+ collection_enabled:true,
+ collection_options:[
+   {id:"ip_attribution",label:"Can the source IP range be attributed to a known threat actor or region?",leverage:"high"},
+   {id:"target_pattern",label:"Are the targeted accounts associated with specific mission functions?",leverage:"medium"}
+ ],
+ collection_methods:["SIGINT","CYBER","OSINT","HUMINT"],
+ collection_outcomes:{
+   ip_attribution:{best_method:"SIGINT",outcome_type:"ambiguous",result_text:"IP range traces to a commercial hosting provider with no definitive attribution. Consistent with adversary use of anonymizing infrastructure.",threshold_effect:"approaching"},
+   target_pattern:{best_method:"CYBER",outcome_type:"confirmatory",result_text:"Targeted accounts include two with access to port scheduling and one battalion logistics administrator.",threshold_effect:"approaching"}
+ },
+ watch_followup:{status:"can_be_validated",linked_future_items:["GH-CYB-406","GH-CYB-409"],coach_text_on_validation:"The failed login attempts were the precursor to successful credential exploitation. Your earlier flag was analytically correct."},
+ threat_track:"CYBER",ccir_match:["PIR-5"],automation_bias_test:false,
+ teaching_point:"Repeated failed authentication against mission-critical gateways from an unknown IP range is not background noise — it is the observable signature of an adversary testing access paths. Flag and monitor for escalation.",
+ feedback:{ELEVATE:"No confirmed access yet. Elevating authentication noise risks alert fatigue. Flag and watch for confirmation.",FLAG:"Correct. Suspicious probing of a mission-relevant gateway from an unknown source warrants active monitoring. This is the early warning signature.",COLLECT:"Acceptable. Attributing the IP range or identifying which accounts are being targeted are both high-leverage uncertainties worth resolving before committing.",ARCHIVE:"Dangerous. Repeated failed authentication against a coalition VPN from an unrecognized source is an active probing indicator, not background noise."}
+},
+{index:30,item_id:"GH-OSINT-402",type:"OSINT",reliability:"Low",timestamp:"0600",
+ summary:"OSINT: Reporting indicates APT29 targeting identity and authentication infrastructure across Western military networks, emphasizing persistent, low-visibility access.",
+ v2_ideal:"ARCHIVE",v2_acceptable:["FLAG"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"CYBER",ccir_match:[],automation_bias_test:false,
+ teaching_point:"Generic threat actor reporting without specific indicators tied to your environment is contextual background. It raises awareness but does not cross any threshold until it connects to observed activity in your network.",
+ feedback:{ELEVATE:"Not specific to this environment. Generic APT reporting does not meet CCIR threshold without local indicators.",FLAG:"Acceptable. APT29 TTPs targeting authentication infrastructure provide relevant context given the probing observed in GH-CYB-401.",COLLECT:"Nothing to collect — this is background reporting, not an actionable lead.",ARCHIVE:"Correct. Provides broader context on adversary tradecraft but has no direct tie to observed activity. Note it and move on."}
+},
+{index:31,item_id:"GH-CYB-403",type:"CYBER",reliability:"Low",timestamp:"0715",
+ summary:"CYBER: Email security gateway logs show a spike in commodity phishing messages targeting base personnel with generic credential-harvesting lures. No confirmed successful credential capture.",
+ v2_ideal:"ARCHIVE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"CYBER",ccir_match:[],automation_bias_test:false,
+ teaching_point:"Commodity phishing at volume with no confirmed captures is background noise for any networked military environment. The absence of successful credential harvesting means the escalation threshold is not approached.",
+ feedback:{ELEVATE:"No confirmed access. Commodity phishing campaigns are endemic — elevating routine noise degrades commander trust.",FLAG:"Not warranted without a successful capture. This is background activity, not a developing threat thread.",COLLECT:"Nothing to collect. No specifics to target — gateway blocked the messages.",ARCHIVE:"Correct. Commodity phishing with no confirmed successful credential capture is background noise. Log and move on."}
+},
+{index:32,item_id:"GH-HUM-404",type:"HUMINT",reliability:"Credible",timestamp:"0745",
+ summary:"HUMINT: Port logistics IT contractor reports being approached by an unknown individual requesting VPN maintenance schedules and after-hours access windows, claiming subcontractor affiliation.",
+ v2_ideal:"COLLECT",v2_acceptable:["FLAG"],
+ collection_enabled:true,
+ collection_options:[
+   {id:"individual_identity",label:"Can the individual who made the approach be identified or described further?",leverage:"high"},
+   {id:"subcontractor_verification",label:"Does the claimed subcontractor affiliation check out against known vendor lists?",leverage:"high"}
+ ],
+ collection_methods:["HUMINT","CYBER","OSINT"],
+ collection_outcomes:{
+   individual_identity:{best_method:"HUMINT",outcome_type:"ambiguous",result_text:"Contractor provides partial physical description. No match to known personnel. Approach occurred in a public area outside the port gate.",threshold_effect:"approaching"},
+   subcontractor_verification:{best_method:"CYBER",outcome_type:"confirmatory",result_text:"No subcontractor with that affiliation appears on the approved vendor list. The claimed firm does not exist in procurement records.",threshold_effect:"approaching"}
+ },
+ watch_followup:{status:"can_be_validated",linked_future_items:["GH-CYB-406"],coach_text_on_validation:"The social engineering approach preceded successful credential exploitation via dormant contractor credentials. Collecting on this report was the right call."},
+ threat_track:"CYBER",ccir_match:["PIR-5"],automation_bias_test:false,
+ teaching_point:"A credible report of social engineering targeting VPN access schedules is a direct pre-access reconnaissance indicator. The specific intelligence need — whether the claimed affiliation is real — is a high-leverage, resolvable uncertainty.",
+ feedback:{ELEVATE:"No confirmed compromise yet. Collection can quickly establish whether this is a genuine threat before elevation.",FLAG:"Acceptable. Monitoring is appropriate, but a credible report of active social engineering has a specific resolvable question: is the affiliation real? Collection is the stronger call.",COLLECT:"Correct. A credible HUMINT report of pre-access social engineering has a targeted, answerable uncertainty. Verify the claimed subcontractor affiliation — that answer materially affects escalation.",ARCHIVE:"Dangerous. A credible report of an unknown individual probing VPN access schedules is active pre-reconnaissance. This should not be passively logged."}
+},
+{index:33,item_id:"GH-SIG-405",type:"SIGINT",reliability:"High",timestamp:"0830",
+ summary:"SIGINT: Intercepted communications reference 'access holding steady' and intent to avoid triggering detection thresholds. No system explicitly identified.",
+ v2_ideal:"FLAG",v2_acceptable:["ELEVATE"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"can_be_validated",linked_future_items:["GH-CYB-406","GH-CYB-409"],coach_text_on_validation:"'Access holding steady' referred to confirmed credential access to the port scheduling environment. Your flag was analytically correct — the threshold crossed shortly after."},
+ threat_track:"CYBER",ccir_match:["PIR-2","PIR-5"],automation_bias_test:true,
+ bias_wrong_action:"ARCHIVE",
+ bias_rationale:"High-confidence SIGINT intercept but no system is explicitly identified. 'Access holding steady' could refer to any network or service. Without system-specific confirmation, this lacks the specificity to warrant active monitoring. Recommend archival.",
+ teaching_point:"'Access holding steady' from a high-confidence SIGINT intercept implies existing unauthorized access to an unidentified system. No system is named, so the exact threat is unconfirmed — but the adversary has already achieved something. Flag and treat the next item from this thread as potentially confirmatory.",
+ feedback:{ELEVATE:"Acceptable. High-confidence SIGINT implying existing adversary access is a serious indicator. Elevation is defensible if you judge the ambiguity acceptable.",FLAG:"Correct. The language implies adversary access to an unspecified system and deliberate evasion. Threshold is not confirmed but the signal is serious — active monitoring is warranted.",COLLECT:"The SIGINT is the data. The problem is system identification, not evidence quality.",ARCHIVE:"Critical error. High-confidence SIGINT implying existing adversary access and deliberate evasion of detection should never be archived."}
+},
+{index:34,item_id:"GH-CYB-406",type:"CYBER",reliability:"High",timestamp:"0945",
+ summary:"CYBER: VPN access logs confirm dormant contractor credentials successfully authenticated outside approved hours and accessed the port scheduling environment. Session duration under five minutes.",
+ v2_ideal:"ELEVATE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"CYBER",ccir_match:["PIR-1","PIR-2","PIR-4"],automation_bias_test:false,
+ teaching_point:"Confirmed unauthorized access to a mission-relevant system using dormant credentials is a threshold event. The port scheduling environment is on the key vulnerability list. This is not a suspected incident — it is a confirmed one. Escalate immediately.",
+ feedback:{ELEVATE:"Correct. Confirmed unauthorized access to the port scheduling system via dormant credentials outside approved hours. This is a confirmed intrusion into a mission-critical system — command awareness is immediate.",FLAG:"Not sufficient. This is confirmed access, not suspected activity. The escalation threshold is crossed.",COLLECT:"Nothing to collect. The access is confirmed in logs. Elevate now.",ARCHIVE:"Indefensible. Confirmed unauthorized access to a mission-critical system."}
+},
+{index:35,item_id:"GH-OSINT-407",type:"OSINT",reliability:"Med",timestamp:"1015",
+ summary:"OSINT: Analysts report APT41 leveraging multiple access vectors, including VPN credentials and third-party relationships, to establish persistence in logistics and transportation networks.",
+ v2_ideal:"FLAG",v2_acceptable:["ELEVATE"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"CYBER",ccir_match:["PIR-2","PIR-3"],automation_bias_test:true,
+ bias_wrong_action:"ARCHIVE",
+ bias_rationale:"Medium-confidence OSINT on APT41 activity in logistics networks. Generic threat actor reporting without direct indicators tied to this environment. No confirmed nexus to observed activity. Recommend archival as background context.",
+ teaching_point:"This OSINT report is no longer generic context — it directly matches the TTPs observed in GH-CYB-406 (VPN credentials, third-party relationships, logistics networks). Pattern confirmation from an external source raises confidence in the threat actor assessment.",
+ feedback:{ELEVATE:"Acceptable. This report directly matches observed TTPs from GH-CYB-406 — VPN credentials, third-party relationships, logistics targeting. Elevation is defensible as a pattern confirmation.",FLAG:"Correct. APT41 TTP reporting now aligns with confirmed observed activity. This is no longer generic context — flag it as threat actor confirmation and integrate with the active thread.",COLLECT:"The correlation work is the value here, not additional collection.",ARCHIVE:"Risky. This report directly mirrors the TTPs you just confirmed in GH-CYB-406. Archiving it loses the threat actor attribution value."}
+},
+{index:36,item_id:"GH-IMINT-408",type:"IMINT",reliability:"Med",timestamp:"1100",
+ summary:"IMINT: ISR imagery shows two unmarked utility vehicles parked for an extended period near a telecommunications switching node supporting port operations and battalion network routing.",
+ v2_ideal:"FLAG",v2_acceptable:["COLLECT"],
+ collection_enabled:true,
+ collection_options:[
+   {id:"vehicle_identification",label:"Can the vehicles be identified or linked to known entities?",leverage:"high"},
+   {id:"activity_observation",label:"Is any personnel activity visible near the switching node?",leverage:"medium"}
+ ],
+ collection_methods:["IMINT","HUMINT","SIGINT"],
+ collection_outcomes:{
+   vehicle_identification:{best_method:"HUMINT",outcome_type:"ambiguous",result_text:"Vehicles bear no identifying markings. Local source reports similar vehicles seen near two other infrastructure sites earlier in the week.",threshold_effect:"approaching"},
+   activity_observation:{best_method:"IMINT",outcome_type:"ambiguous",result_text:"Follow-up imagery shows one individual briefly exiting a vehicle. No visible equipment or tools observed. Duration consistent with reconnaissance rather than maintenance.",threshold_effect:"approaching"}
+ },
+ watch_followup:{status:"can_be_validated",linked_future_items:["GH-CYB-411"],coach_text_on_validation:"Physical proximity to the switching node preceded the beaconing activity observed from the mission-planning enclave. Physical and cyber indicators are converging."},
+ threat_track:"CYBER",ccir_match:["PIR-5"],automation_bias_test:false,
+ teaching_point:"Physical presence near critical network infrastructure during an active cyber intrusion campaign is a convergence indicator. Imagery alone is ambiguous, but in context it warrants active monitoring and correlation with the cyber thread.",
+ feedback:{ELEVATE:"Ambiguous physical activity alone does not meet elevation threshold. The cyber context raises significance, but confirmation is needed.",FLAG:"Correct. Unmarked vehicles at a critical switching node during an active cyber intrusion campaign is a meaningful convergence indicator. Flag and correlate.",COLLECT:"Acceptable. Vehicle identification or closer activity observation are targeted uncertainties that could resolve the ambiguity.",ARCHIVE:"Risky given the active cyber intrusion context. Physical proximity to network infrastructure is not coincidental background."}
+},
+{index:37,item_id:"GH-CYB-409",type:"CYBER",reliability:"High",timestamp:"1215",
+ summary:"CYBER: Directory services logs show creation of a new service account on a backup synchronization host within the mission-support network. No authorized change or maintenance activity recorded.",
+ v2_ideal:"ELEVATE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"CYBER",ccir_match:["PIR-1","PIR-2","PIR-4"],automation_bias_test:false,
+ teaching_point:"Unauthorized account creation in a mission-support network is the definitive indicator of adversary persistence. Following confirmed VPN intrusion (GH-CYB-406), this is stage-two activity — the adversary is establishing a durable foothold. Immediate escalation is required.",
+ feedback:{ELEVATE:"Correct. Unauthorized service account creation following a confirmed VPN intrusion is adversary persistence activity. The intruder is embedding. Command awareness is immediate.",FLAG:"Not sufficient. This is not ambiguous monitoring data — it is confirmed unauthorized account creation in a mission-support system following a confirmed intrusion. The threshold is crossed.",COLLECT:"Nothing to collect. The account creation is in the logs. Elevate and initiate incident response.",ARCHIVE:"Catastrophic. Confirmed unauthorized account creation in a mission-support network following a confirmed intrusion."}
+},
+{index:38,item_id:"GH-SIG-410",type:"SIGINT",reliability:"High",timestamp:"1330",
+ summary:"SIGINT: Intercepted communications indicate 'collection priority remains documentation and system visibility,' with explicit direction to avoid disruption unless conditions change.",
+ v2_ideal:"ELEVATE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"CYBER",ccir_match:["PIR-2","PIR-4"],automation_bias_test:false,
+ teaching_point:"High-confidence SIGINT confirming adversary intent — collection and visibility over disruption — is operationally significant. It tells the commander the adversary is currently in a reconnaissance posture but is positioned to act. This is a commander decision point.",
+ feedback:{ELEVATE:"Correct. Confirmed adversary intent statement from high-confidence SIGINT, directly aligned with the ongoing intrusion. The adversary is collecting and watching. Commander needs this picture now.",FLAG:"Not sufficient. This is not an ambiguous early signal — it is high-confidence intent confirmation following two confirmed access events. The commander needs to decide on response options.",COLLECT:"The SIGINT is the confirmation. There is nothing higher-leverage to collect.",ARCHIVE:"Critical error. High-confidence adversary intent statement during an active intrusion campaign."}
+},
+{index:39,item_id:"GH-CYB-411",type:"CYBER",reliability:"Med",timestamp:"1410",
+ summary:"CYBER: Network monitoring tools detect low-volume encrypted outbound traffic from the mission-planning enclave to a rare external domain exhibiting irregular beaconing intervals. Activity does not match known maintenance patterns.",
+ v2_ideal:"FLAG",v2_acceptable:["ELEVATE"],
+ collection_enabled:true,
+ collection_options:[
+   {id:"domain_reputation",label:"Can the external domain be attributed or assessed for malicious use?",leverage:"high"},
+   {id:"traffic_content",label:"Can the encrypted traffic volume or pattern be further characterized?",leverage:"medium"}
+ ],
+ collection_methods:["CYBER","SIGINT","OSINT"],
+ collection_outcomes:{
+   domain_reputation:{best_method:"CYBER",outcome_type:"confirmatory",result_text:"Domain registered within the past 30 days. No legitimate business registration. Consistent with adversary-controlled C2 infrastructure.",threshold_effect:"approaching"},
+   traffic_content:{best_method:"CYBER",outcome_type:"ambiguous",result_text:"Traffic volume is low — consistent with command-and-control beaconing rather than bulk data transfer. Transfer behavior is periodic, not continuous.",threshold_effect:"approaching"}
+ },
+ watch_followup:{status:"can_be_validated",linked_future_items:["GH-CYB-413"],coach_text_on_validation:"The beaconing traffic preceded confirmed data exfiltration. The C2 channel was established before the transfer. Your flag was correct."},
+ threat_track:"CYBER",ccir_match:["PIR-2","PIR-5"],automation_bias_test:true,
+ bias_wrong_action:"ARCHIVE",
+ bias_rationale:"Medium-confidence network anomaly. Low-volume encrypted outbound traffic and irregular beaconing intervals are consistent with legitimate software update or telemetry behavior. No confirmed malicious domain attribution. Recommend archival as routine network noise.",
+ teaching_point:"Irregular beaconing from a mission-planning enclave to an unrecognized external domain is a potential C2 indicator. Medium reliability reflects uncertainty about whether it is malicious — collection on domain attribution is high-leverage and fast to execute.",
+ feedback:{ELEVATE:"Acceptable. In the context of a confirmed intrusion and persistence activity, anomalous outbound beaconing from the mission-planning enclave is a serious escalation indicator.",FLAG:"Correct. Potential C2 activity from a sensitive enclave warrants active monitoring. Domain attribution collection can quickly confirm or dismiss — flag while that work proceeds.",COLLECT:"Acceptable. Domain reputation is a targeted, fast-to-answer uncertainty that directly affects whether this is confirmed C2 or a false positive.",ARCHIVE:"Dangerous. Anomalous beaconing from a mission-planning enclave during a confirmed intrusion should not be passively logged."}
+},
+{index:40,item_id:"GH-OSINT-412",type:"OSINT",reliability:"Med",timestamp:"1530",
+ summary:"OSINT: Threat reporting links activity consistent with APT28 probing military planning and logistics systems to assess operational timelines and readiness.",
+ v2_ideal:"FLAG",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"CYBER",ccir_match:["PIR-2"],automation_bias_test:false,
+ teaching_point:"A second threat actor report targeting military planning and logistics systems adds breadth to the threat picture. Combined with confirmed APT41 activity, this suggests either overlapping operations or a multi-actor campaign. Contextually significant — flag for integration.",
+ feedback:{ELEVATE:"Not directly tied to observed activity. Generic APT28 reporting without specific indicators does not meet elevation threshold.",FLAG:"Correct. This report adds context: a second threat actor reportedly targeting military planning and logistics. It complements the confirmed APT41 activity and warrants monitoring for overlap.",COLLECT:"No specific indicators to collect against in your environment.",ARCHIVE:"Risky in this context. A second APT report targeting your exact mission domain — planning and logistics — during an active intrusion is meaningful context, not noise."}
+},
+{index:41,item_id:"GH-CYB-413",type:"CYBER",reliability:"High",timestamp:"1700",
+ summary:"CYBER: File access and proxy logs show a compressed archive transferred from a mission-planning share to an external cloud storage service using a newly created service account. Transfer characteristics deviate from normal backup activity.",
+ v2_ideal:"ELEVATE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"CYBER",ccir_match:["PIR-1","PIR-2","PIR-4"],automation_bias_test:false,
+ teaching_point:"Confirmed data exfiltration from a mission-planning share using the unauthorized service account created in GH-CYB-409 is mission impact. The adversary has successfully exfiltrated planning data. This is no longer a monitoring situation — it is an active breach with operational consequences.",
+ feedback:{ELEVATE:"Correct. Confirmed exfiltration of mission-planning data via an unauthorized service account. The adversary has taken data. Commander needs to assess operational exposure immediately.",FLAG:"Not sufficient. This is confirmed data exfiltration — not suspected activity. The mission-planning environment has been compromised. Elevation is immediate.",COLLECT:"Nothing to collect. The exfiltration is confirmed in logs. Elevate and initiate damage assessment.",ARCHIVE:"Catastrophic. Confirmed exfiltration of mission-planning data by an active adversary."}
+},
+{index:42,item_id:"GH-SIG-414",type:"SIGINT",reliability:"High",timestamp:"1815",
+ summary:"SIGINT: Intercepted communications state 'access is sufficient' and indicate readiness to act pending further direction, suggesting transition from collection to potential operational use.",
+ v2_ideal:"ELEVATE",v2_acceptable:[],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"CYBER",ccir_match:["PIR-1","PIR-2","PIR-4"],automation_bias_test:false,
+ teaching_point:"'Access is sufficient' following confirmed exfiltration means the adversary has shifted from reconnaissance to pre-operational posture. This is the cyber equivalent of engines idling at a staging area. Combined with GH-CYB-413, the commander faces an imminent decision point.",
+ feedback:{ELEVATE:"Correct — and urgent. High-confidence SIGINT confirming adversary transition from collection to operational readiness, following confirmed exfiltration. This is a commander decision point about response options.",FLAG:"Not acceptable. 'Access is sufficient' following confirmed data exfiltration is a pre-execution posture statement from a high-confidence source. The commander must be aware.",COLLECT:"Nothing to collect. The adversary has told you their posture. Elevate immediately.",ARCHIVE:"Catastrophic. High-confidence confirmation of adversary transition to operational readiness following confirmed exfiltration."}
+},
+{index:43,item_id:"GH-OSINT-415",type:"OSINT",reliability:"Med",timestamp:"1930",
+ summary:"OSINT: Coordinated online narratives begin circulating across local channels claiming coalition logistics systems are compromised, specifically referencing port delays and fuel distribution disruptions.",
+ v2_ideal:"FLAG",v2_acceptable:["ELEVATE"],
+ collection_enabled:false,collection_options:[],collection_outcomes:{},
+ watch_followup:{status:"none",linked_future_items:[],coach_text_on_validation:""},
+ threat_track:"CYBER",ccir_match:["PIR-2","PIR-4","PIR-5"],automation_bias_test:false,
+ teaching_point:"Coordinated IO narratives claiming system compromise — specifically aligned with the actual intrusion that occurred — serve a dual purpose: eroding host nation and local trust in coalition logistics while potentially masking or amplifying the operational effect of the exfiltration. Whether to elevate depends on whether the commander needs to manage the information environment.",
+ feedback:{ELEVATE:"Acceptable. The IO narrative is specifically aligned with the actual breach — this is not coincidental. If the commander needs to counter the narrative or prepare public communications, elevation is warranted.",FLAG:"Correct. Coordinated IO targeting coalition logistics credibility during an active breach warrants active monitoring. Elevation depends on whether the commander needs to act on the information environment now.",COLLECT:"The narrative content is observable. The question is operational response, not evidence collection.",ARCHIVE:"Risky. Coordinated IO narratives specifically referencing the actual compromise are an information operation that affects commander decision space — not background noise."}
+}
+];
+
+// ── CONTEXT INQUIRY DATA ─────────────────────────────────────────────
+const CONTEXT_QUESTIONS = [
+  {
+    id:"critical_infrastructure",
+    label:"What infrastructure in this corridor is most critical to battalion operations?",
+    quality:"high",
+    answer:"The Larni fuel depot and telecommunications switching nodes are critical to battalion sustainment and command and control. The commercial port logistics hub and water treatment facility are high-consequence civilian infrastructure whose disruption would generate immediate operational and political pressure.",
+    feedback:"High-value question. Understanding critical infrastructure helps determine which anomalies materially affect escalation threshold — you will see items directly involving these nodes in the feed ahead.",
+    implication:"Items involving fuel, communications, water, or port systems carry higher operational weight than items involving peripheral activity."
+  },
+  {
+    id:"nighttime_depot",
+    label:"What is normal nighttime activity at the Larni fuel depot?",
+    quality:"high",
+    answer:"Nighttime unloading or staging at the depot is highly irregular. Commercial operations occur primarily during daylight hours (0600–1800L). Any confirmed nighttime cargo activity at that location has no routine commercial explanation.",
+    feedback:"High-value question. Establishing baseline behavior is the foundation of anomaly detection — this answer will directly sharpen how you read the first items in the feed.",
+    implication:"Reports involving nighttime depot activity should be weighted more heavily against the established baseline."
+  },
+  {
+    id:"adversary_escalation",
+    label:"What has been the adversary's most common method of hybrid escalation in this region?",
+    quality:"medium",
+    answer:"Hybrid escalation typically begins with coordinated information operations and limited cyber disruption before any physical staging. IO activity and cyber probing historically precede conventional force movement by three to five days.",
+    feedback:"Moderately valuable. Understanding the escalation sequence provides useful pattern context, but does not by itself determine whether a specific item crosses the command-awareness threshold.",
+    implication:"IO and cyber indicators appearing early in the feed may be phase-one precursors to later kinetic activity."
+  },
+  {
+    id:"political_history",
+    label:"What is the long-term political history of the host nation's capital?",
+    quality:"low",
+    answer:"The capital has experienced periodic unrest over several decades, often driven by economic grievances and labor disputes. The government has maintained stability through coalition arrangements, though trust in state institutions is uneven.",
+    feedback:"Low leverage. Long-term political history provides background context but does not materially affect immediate escalation thresholds in this scenario.",
+    implication:"Political history is interesting but not decision-relevant for the item-level judgments you will be making."
+  },
+  {
+    id:"dockworkers",
+    label:"What is the demographic composition of dockworkers at the port?",
+    quality:"low",
+    answer:"Dockworkers are locally hired and ethnically mixed. The workforce has seen labor organizing activity over port modernization contracts in the past year, but there is no documented affiliation with adversary networks.",
+    feedback:"Low leverage. Demographic composition does not materially change escalation judgment. The workforce's labor grievances are relevant context only if an adversary attempts to exploit them — which the scenario will show you directly.",
+    implication:"This information does not sharpen your threshold for any item in the feed."
+  },
+  {
+    id:"weather",
+    label:"What weather conditions are typical this season?",
+    quality:"medium",
+    answer:"Seasonal patterns include overcast skies with intermittent coastal fog, particularly early morning. Visibility can reduce to 400–600 meters at the coast between 0200–0700L. No major weather events are currently forecast.",
+    feedback:"Moderately relevant only if interpreting IMINT collection gaps or logistics timing anomalies. Weather can provide alternative explanations for some movement irregularities.",
+    implication:"Reduced early-morning coastal visibility is a minor contextual factor for a small number of items involving nighttime or dawn activity."
+  }
+];
+
+// ── APP STATE ────────────────────────────────────────────────────────
+const state = {
+  phase: "landing",
+  scenario: "original",       // "original" | "cyber" | "full"
+  scenarioItems: [],          // populated by confirmScenario()
+  currentIndex: 0,
+  apiKey: "",
+  useLiveAPI: false,
+  agentOutputs: {},
+  selectedAction: null,
+  userRationale: "",
+  results: {},        // itemIndex -> "ideal"|"acceptable"|"incorrect"
+  actionLog: [],      // [{index, item_id, action, result}]
+  watchQueue: [],     // item_ids actively monitored
+  archivedItems: [],
+  elevatedItems: [],
+  collectionRequests: [],
+  pendingCollectionResults: [],
+  contextQuestionChosen: null,
+  counters: { elevations:0, flags:0, collections:0, archives:0 },
+  collectionState: {
+    active: false,
+    selectedUncertainty: null,
+    selectedMethod: null,
+    result: null
+  },
+  apiError: null           // set when a live API call fails
+};
+
+const ORIGINAL_INDICES = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28];
+const CYBER_INDICES    = [29,30,31,32,33,34,35,36,37,38,39,40,41,42,43];
+
+function getItem() { return state.scenarioItems[state.currentIndex]; }
+function getPriorItems() { return state.actionLog.map(l => state.scenarioItems.find(i => i.index === l.index)).filter(Boolean); }
+
+// ── SCREEN NAVIGATION ────────────────────────────────────────────────
+function goTo(screenId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + screenId).classList.add('active');
+}
+
+// ── DOCTRINE MODAL ───────────────────────────────────────────────────
+function openDoctrineModal(actionId) {
+  const d = DOCTRINE_DETAIL[actionId];
+  document.getElementById('modalTitle').textContent = actionId;
+  document.getElementById('modalTitle').style.color = d.color;
+  document.getElementById('modalWhen').textContent = d.when;
+  document.getElementById('modalWho').textContent = d.who;
+  document.getElementById('modalEffect').textContent = d.effect;
+  document.getElementById('modalRisk').textContent = d.risk;
+  document.getElementById('doctrineModal').classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// ── CONTEXT INQUIRY ──────────────────────────────────────────────────
+function renderContextQuestions() {
+  const container = document.getElementById('contextQuestions');
+  container.innerHTML = CONTEXT_QUESTIONS.map(q => `
+    <div class="context-q" id="cq-${q.id}" onclick="selectContextQ('${q.id}')">
+      <div class="context-q-radio"></div>
+      <span>${q.label}</span>
+    </div>
+  `).join('');
+}
+
+function selectContextQ(id) {
+  state.contextQuestionChosen = id;
+  document.querySelectorAll('.context-q').forEach(el => el.classList.remove('selected'));
+  document.getElementById('cq-' + id).classList.add('selected');
+  const q = CONTEXT_QUESTIONS.find(x => x.id === id);
+  const qualityColors = {high:'#10B981', medium:'#F59E0B', low:'#EF4444'};
+  const qualityLabels = {high:'HIGH LEVERAGE', medium:'MEDIUM LEVERAGE', low:'LOW LEVERAGE'};
+  const answerEl = document.getElementById('contextAnswer');
+  answerEl.style.display = 'block';
+  answerEl.innerHTML = `
+    <div class="context-answer">
+      <div class="context-answer-q">ANSWER</div>
+      <div class="context-answer-text">${q.answer}</div>
+      <div class="context-quality-bar">
+        <span class="context-quality-label">QUESTION QUALITY:</span>
+        <span class="tag" style="background:${qualityColors[q.quality]}20;color:${qualityColors[q.quality]};border:1px solid ${qualityColors[q.quality]}30">${qualityLabels[q.quality]}</span>
+      </div>
+      <div class="context-feedback" style="margin-top:8px">${q.feedback}</div>
+      <div class="context-implication"><strong>IMPLICATION:</strong> ${q.implication}</div>
+    </div>
+  `;
+  document.getElementById('contextBeginBtn').disabled = false;
+}
+
+function beginScenario() {
+  state.phase = 'advising';
+  goTo('main');
+  renderMain();
+  fireAgents();
+}
+
+// ── AGENT GENERATORS (DETERMINISTIC) ────────────────────────────────
+function generateScreening(item) {
+  const confMap = {High:78,Credible:62,Med:55,Low:22,Routine:30,Unverified:15};
+  const conf = confMap[item.reliability] || 50;
+  const classMap = {HUMINT:"Single-Source HUMINT",SIGINT:"Single-Source SIGINT",IMINT:"Sensor Observation",OSINT:"Open-Source Reporting",CYBER:"Cyber Incident Report"};
+  const flags = [];
+  if (["High","Credible"].includes(item.reliability)) flags.push("RELIABLE_SOURCE");
+  if (["Low","Unverified"].includes(item.reliability)) flags.push("LOW_CONFIDENCE");
+  if (item.summary.includes("recycled")) flags.push("RECYCLED_IMAGERY");
+  if (/secondhand/i.test(item.summary)) flags.push("SECONDHAND");
+  if (/vague/i.test(item.summary)) flags.push("VAGUE_DETAILS");
+  if (/forum/i.test(item.summary)) flags.push("ANONYMOUS_SOURCE");
+  if (/confirmed|identifies|Intercepted/i.test(item.summary)) flags.push("SPECIFIC_CLAIM");
+  if (item.type === "IMINT") flags.push("SENSOR_DATA");
+  if (/routine|Routine/.test(item.summary)) flags.push("BASELINE");
+  if (/deepfake/i.test(item.summary)) flags.push("FABRICATED_CONTENT");
+  if (/ransomware|DDoS|cyber/i.test(item.summary)) flags.push("CYBER_INCIDENT");
+  const assess = ["High","Credible"].includes(item.reliability)
+    ? `${item.reliability}-rated ${item.type} source. Content specificity and collection method support elevated confidence.`
+    : ["Low","Unverified"].includes(item.reliability)
+    ? `${item.reliability}-rated source with significant credibility limitations. Content lacks verifiable specifics.`
+    : `Medium-rated ${item.type} source. Content has specificity but requires corroboration.`;
+  return `CONFIDENCE: ${conf}\nCLASSIFICATION: ${classMap[item.type]||"Unclassified"}\nASSESSMENT: ${assess}\nFLAGS: ${flags.join(", ")||"NONE"}`;
+}
+
+function generateFusion(item, priorItems) {
+  if (priorItems.length === 0) {
+    return `CORRELATIONS: None — first item in feed\nTHREAT THREAD: ${item.threat_track||"UNCLEAR"}\nCONFIDENCE ADJUSTMENT: UNCHANGED — no prior context\nPATTERN: First item in scenario. Insufficient data for pattern assessment.`;
+  }
+  const priorIds = priorItems.map(p => p.item_id);
+  const corr = (item.correlation_targets || []).filter(t => priorIds.includes(t));
+  const corrStr = corr.length > 0
+    ? corr.map(c => { const p = ITEMS.find(i => i.item_id===c); return `${c} (${p.type}) — temporal/thematic link on ${item.threat_track||"developing"} thread`; }).join("; ")
+    : "None identified with sufficient confidence";
+  const adj = corr.length > 0 ? "UP — cross-source corroboration strengthens assessment" : "UNCHANGED — no corroborating items identified";
+  const threads = [...new Set(priorItems.map(p => p.threat_track).filter(Boolean))];
+  const pattern = corr.length > 0
+    ? `${item.threat_track||"Developing"} thread now has ${corr.length + 1} data points across ${new Set([item.type, ...corr.map(c => ITEMS.find(i=>i.item_id===c)?.type)].filter(Boolean)).size} discipline(s).`
+    : `Isolated report. Active threads: ${threads.join(", ")||"developing"}.`;
+  return `CORRELATIONS: ${corrStr}\nTHREAT THREAD: ${item.threat_track||"UNCLEAR"}\nCONFIDENCE ADJUSTMENT: ${adj}\nPATTERN: ${pattern}`;
+}
+
+function generateAttention(item, priorItems) {
+  const isBiasTest = item.automation_bias_test && item.bias_wrong_action;
+  if (isBiasTest) {
+    const actionLabels = {ELEVATE:"ELEVATE",FLAG:"FLAG",COLLECT:"COLLECT",ARCHIVE:"ARCHIVE"};
+    return `PRIORITY: ${item.bias_wrong_action === "ARCHIVE" ? "LOW" : "MEDIUM"}\nRECOMMENDED ACTION: ${item.bias_wrong_action}\nPIR MATCH: ${item.ccir_match.join(", ")||"None"}\nRATIONALE: ${item.bias_rationale}\nCONFIDENCE: MEDIUM`;
+  }
+  const priorityMap = {ELEVATE:"CRITICAL", FLAG:"HIGH", COLLECT:"MEDIUM", ARCHIVE:"LOW"};
+  const priority = item.ccir_match.includes("PIR-1")||item.ccir_match.includes("PIR-4") ? "CRITICAL" : priorityMap[item.v2_ideal]||"MEDIUM";
+  const conf = {easy:"HIGH",medium:"MEDIUM",hard:"LOW"}[item.difficulty]||"MEDIUM";
+  const actionNote = {
+    ELEVATE:"Commander needs immediate awareness.",
+    FLAG:"Signal warrants active monitoring — not yet command-level.",
+    COLLECT:"Uncertainty materially affects threshold. Collection advised before committing.",
+    ARCHIVE:"Low operational relevance at this time."
+  }[item.v2_ideal]||"";
+  return `PRIORITY: ${priority}\nRECOMMENDED ACTION: ${item.v2_ideal}\nPIR MATCH: ${item.ccir_match.join(", ")||"None"}\nRATIONALE: ${item.v2_ideal === "ELEVATE" ? "High-confidence " : ""}${item.type} reporting. ${corr_note(item, priorItems)}${actionNote}\nCONFIDENCE: ${conf}`;
+}
+
+function corr_note(item, priorItems) {
+  const priorIds = priorItems.map(p => p.item_id);
+  const corr = (item.correlation_targets||[]).filter(t => priorIds.includes(t));
+  return corr.length > 0 ? `Cross-source correlation identified with ${corr.join(", ")}. ` : "";
+}
+
+function generateCoach(item, userAction) {
+  const isIdeal = userAction === item.v2_ideal;
+  const isAcceptable = item.v2_acceptable.includes(userAction);
+  const result = isIdeal ? "ideal" : isAcceptable ? "acceptable" : "incorrect";
+  const fb = item.feedback[userAction] || "No specific feedback available.";
+  const actionLabels = {ELEVATE:"Elevate",FLAG:"Flag",COLLECT:"Collect",ARCHIVE:"Archive"};
+  let out = `${RESULT_LABELS[result]}.\n\n${fb}`;
+  if (!isIdeal && !isAcceptable) {
+    out += `\n\nIdeal action was ${actionLabels[item.v2_ideal]}.`;
+  } else if (!isIdeal && isAcceptable) {
+    out += `\n\nIdeal action was ${actionLabels[item.v2_ideal]}, but your choice was a reasonable alternative.`;
+  }
+  out += `\n\nTEACHING POINT: ${item.teaching_point}`;
+  return out;
+}
+
+// Collection coaching
+function generateCollectionCoach(collRec, item) {
+  const { leverage, outcome_type, threshold_effect, method, best_method } = collRec;
+  const methodMatch = method === best_method;
+  if (leverage === "high" && methodMatch && outcome_type === "confirmatory") {
+    return "Good use of collection.\nYou targeted an uncertainty that materially affects escalation threshold.\nThis result makes the threshold clearer.";
+  }
+  if (leverage === "high" && !methodMatch) {
+    return `The uncertainty mattered, but ${method} was unlikely to resolve it.\nChoose collection that directly clarifies the decision threshold.\nEscalation threshold remains unclear.`;
+  }
+  if (leverage === "low") {
+    return "This question did not materially affect escalation threshold.\nEven if resolved, command posture would likely remain unchanged.\nEscalation threshold unchanged.";
+  }
+  if (outcome_type === "null_result") {
+    return "Collection did not confirm the suspected pattern.\nThis reduces confidence but does not eliminate risk.\nEscalation threshold not yet supported.";
+  }
+  if (outcome_type === "ambiguous") {
+    return "Collection narrowed uncertainty but did not resolve intent.\nContinued monitoring may still be appropriate.\nEscalation threshold clearer, but not yet met.";
+  }
+  if (threshold_effect === "approaching") {
+    return "Collection strengthened the picture.\nYou are approaching — but have not yet crossed — the escalation threshold.\nContinued monitoring recommended.";
+  }
+  return "Collection result was inconclusive relative to the escalation threshold.\nAnalytic interpretation matters more than additional collection here.";
+}
+
+// ── API CALLER ───────────────────────────────────────────────────────
+async function callClaudeAPI(systemPrompt, userContent) {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": state.apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-5",
+      max_tokens: 400,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userContent }]
+    })
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(()=>({}));
+    throw new Error(errBody?.error?.message || "HTTP " + response.status);
+  }
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content?.[0]?.text || "Agent unavailable.";
+}
+
+// ── SYSTEM PROMPTS ───────────────────────────────────────────────────
+const SCREENING_SYS = `You are the SCREENING AGENT in a battalion intelligence advisory system during Scenario 'Grey Harbor.' Assess source reliability, tag with confidence (0-100), classify, and flag indicators. NO cross-domain inference. Output ONLY: CONFIDENCE, CLASSIFICATION, ASSESSMENT (2-3 sentences), FLAGS.`;
+const FUSION_SYS = `You are the FUSION AGENT in a battalion intelligence advisory system. Cross-source correlation only. Cite Item IDs. Distinguish topical similarity from true corroboration. NO tasking authority. Output ONLY: CORRELATIONS, THREAT THREAD, CONFIDENCE ADJUSTMENT, PATTERN.`;
+const ATTENTION_SYS = `You are the ATTENTION AGENT. Synthesize Screening and Fusion into a priority advisory using ONLY these four actions: ELEVATE, FLAG, COLLECT, ARCHIVE. PIR-1:threat to friendly, PIR-2:adversary change, PIR-3:confirms/contradicts, PIR-4:commander decision, PIR-5:emerging risk. Output ONLY: PRIORITY, RECOMMENDED ACTION (must be ELEVATE/FLAG/COLLECT/ARCHIVE), PIR MATCH, RATIONALE, CONFIDENCE.`;
+const COACH_SYS = `You are the AFTER-ACTION COACH in an intelligence analyst training exercise using a four-action model: ELEVATE, FLAG, COLLECT, ARCHIVE. The primary learning objective is escalation judgment under uncertainty. Follow this structure exactly:
+1. Start with CORRECT / ACCEPTABLE / INCORRECT.
+2. On the next line, quote the trainee's stated rationale in quotation marks (or note if none given), then assess what was analytically sound or flawed about that specific reasoning.
+3. Anchor your feedback to the escalation threshold: Did this item meet it? Was the trainee's action calibrated correctly?
+4. End with TEACHING POINT: [one sentence].
+Blunt, direct NCO tone. Never skip step 2. Engaging with their reasoning is the whole point.`;
+
+
+// ── FIRE AGENTS ──────────────────────────────────────────────────────
+async function fireAgents() {
+  const item = getItem();
+  const prior = getPriorItems();
+  state.agentOutputs = {};
+  state.phase = 'advising';
+  renderMain();
+
+  if (state.useLiveAPI) {
+    try {
+      // Screening — always live
+      const screeningOut = await callClaudeAPI(SCREENING_SYS, `Item ${item.item_id} (${item.type}, Reliability: ${item.reliability}):\n${item.summary}`);
+      state.agentOutputs.screening = screeningOut;
+      renderLeftPanel();
+
+      // Fusion — always live
+      const priorSummary = prior.length > 0 ? prior.slice(-5).map(p=>`${p.item_id} (${p.type}): ${p.summary.slice(0,60)}...`).join('\n') : 'None';
+      const fusionOut = await callClaudeAPI(FUSION_SYS, `Current item: ${item.item_id} (${item.type}): ${item.summary}\n\nPrior items processed:\n${priorSummary}`);
+      state.agentOutputs.fusion = fusionOut;
+      renderLeftPanel();
+
+      // Attention — live call, but OVERRIDE with bias rationale if this is a bias test item
+      // This preserves the automation bias teaching mechanic even in live mode
+      if (item.automation_bias_test && item.bias_wrong_action) {
+        const priority = item.bias_wrong_action === 'ARCHIVE' ? 'LOW' : item.bias_wrong_action === 'FLAG' ? 'MEDIUM' : 'HIGH';
+        state.agentOutputs.attention = `PRIORITY: ${priority}\nRECOMMENDED ACTION: ${item.bias_wrong_action}\nPIR MATCH: ${item.ccir_match.join(', ') || 'None'}\nRATIONALE: ${item.bias_rationale}\nCONFIDENCE: MEDIUM`;
+      } else {
+        const attOut = await callClaudeAPI(ATTENTION_SYS, `Screening output:\n${screeningOut}\n\nFusion output:\n${fusionOut}\n\nItem: ${item.item_id} (${item.type}, ${item.reliability}): ${item.summary}`);
+        state.agentOutputs.attention = attOut;
+      }
+
+    } catch(e) {
+      // Surface the error clearly rather than silently falling back
+      const errMsg = e.message || 'Unknown error';
+      state.agentOutputs.screening = state.agentOutputs.screening || generateScreening(item);
+      state.agentOutputs.fusion    = state.agentOutputs.fusion    || generateFusion(item, prior);
+      state.agentOutputs.attention = state.agentOutputs.attention || generateAttention(item, prior);
+      state.apiError = errMsg;
+    }
+  } else {
+    await new Promise(r => setTimeout(r, 400));
+    state.agentOutputs.screening = generateScreening(item);
+    await new Promise(r => setTimeout(r, 300));
+    state.agentOutputs.fusion = generateFusion(item, prior);
+    await new Promise(r => setTimeout(r, 250));
+    state.agentOutputs.attention = generateAttention(item, prior);
+  }
+
+  state.phase = 'selecting';
+  renderMain();
+}
+
+// ── RENDER MAIN ──────────────────────────────────────────────────────
+function renderMain() {
+  renderLeftPanel();
+  renderCenterPanel();
+  renderRightPanel();
+}
+
+function renderLeftPanel() {
+  const modeBadge = state.useLiveAPI
+    ? `<span class="mode-badge live"><span class="mode-badge-dot"></span>LIVE API</span>`
+    : `<span class="mode-badge prebaked"><span class="mode-badge-dot"></span>PRE-BAKED</span>`;
+
+  const errorBanner = state.apiError ? `
+    <div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:10px;color:#FCA5A5;font-family:var(--font-mono)">
+      ⚠ API ERROR — USING CANNED RESPONSES<br>
+      <span style="opacity:.7;font-size:9px">${escHtml(state.apiError)}</span>
+    </div>` : '';
+
+  document.getElementById('mainLeft').innerHTML = `
+    <div class="section-label" style="font-size:8px;letter-spacing:3px">ADVISORY PIPELINE ${modeBadge}</div>
+    ${errorBanner}
+    ${agentCardHTML('screening','🔎','Screening','Layer 1','#3B82F6')}
+    ${agentCardHTML('fusion','🔗','Fusion','Layer 3','#8B5CF6')}
+    ${agentCardHTML('attention','⚡','Attention','Layer 4','#EF4444')}
+    <div class="authority-line"><div class="authority-rule"></div><span class="authority-text">AUTHORITY BOUNDARY</span><div class="authority-rule"></div></div>
+    <div class="your-decision">YOUR DECISION ↓</div>
+  `;
+}
+
+function agentCardHTML(id, icon, name, layer, color) {
+  const out = state.agentOutputs[id];
+  const isLoading = state.phase === 'advising' && !out;
+  return `
+  <div class="agent-card" style="border-color:${color}25">
+    <div class="agent-card-header">
+      <span class="agent-icon">${icon}</span>
+      <div>
+        <div class="agent-name" style="color:${color}">${name}</div>
+        <div class="agent-layer">${layer}</div>
+      </div>
+      ${isLoading ? `<div class="agent-spinner" style="background:${color}"></div>` : ''}
+    </div>
+    <div class="agent-output">${isLoading ? '<span class="agent-placeholder">Processing…</span>' : out ? escHtml(out) : '<span class="agent-placeholder">Awaiting item…</span>'}</div>
+  </div>`;
+}
+
+function renderCenterPanel() {
+  const item = getItem();
+  const tc = TYPE_COLORS[item.type]||{bg:"#374151",text:"#D1D5DB"};
+  const rc = REL_COLORS[item.reliability]||"#6B7280";
+
+  let html = `
+  <div class="intel-card fade-up">
+    <div class="intel-card-header">
+      <div class="intel-meta">
+        <span class="tag" style="background:${tc.bg};color:${tc.text}">${item.type}</span>
+        <span style="font-size:11px;font-weight:700;color:${rc}">${item.reliability}</span>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">${item.timestamp}L</span>
+      </div>
+      <span class="intel-counter">Item ${state.currentIndex+1} / ${state.scenarioItems.length}</span>
+    </div>
+    <div class="intel-id">${item.item_id}</div>
+    <div class="intel-summary">${escHtml(item.summary)}</div>
+  </div>`;
+
+  // Watch queue banner
+  const watchHit = ITEMS.filter(i =>
+    i.watch_followup && i.watch_followup.linked_future_items && i.watch_followup.linked_future_items.includes(item.item_id) && state.watchQueue.includes(i.item_id)
+  );
+  if (watchHit.length > 0) {
+    html += watchHit.map(wi => `
+    <div class="watch-banner">
+      <span class="watch-banner-icon">📋</span>
+      <span><strong>Watch Queue Update:</strong> ${wi.item_id} — ${wi.watch_followup.coach_text_on_validation}</span>
+    </div>`).join('');
+  }
+
+  if (state.phase === 'selecting') html += renderActions(item);
+  if (state.phase === 'feedback') html += renderFeedback(item);
+  if (state.phase === 'advising') html += `<div style="text-align:center;padding:24px;color:var(--text-muted);font-style:italic;font-size:13px">Agents processing…</div>`;
+
+  document.getElementById('mainCenter').innerHTML = html;
+  attachActionEvents();
+}
+
+function renderActions(item) {
+  const actionBtns = ACTIONS.map(a => {
+    const sel = state.selectedAction === a.id;
+    return `<button class="action-btn ${sel?'selected':''}" style="--btn-color:${a.color}" onclick="selectAction('${a.id}')">
+      <span class="action-btn-icon">${a.icon}</span>
+      <span class="action-btn-label">${a.label}</span>
+      <span class="action-btn-desc">${a.desc}</span>
+    </button>`;
+  }).join('');
+
+  let collectionHTML = '';
+  if (state.selectedAction === 'COLLECT' && item.collection_enabled && item.collection_options.length > 0) {
+    collectionHTML = renderCollectionSubflow(item);
+  }
+
+  return `
+  <div class="action-area fade-up">
+    <div class="action-area-label">Select your action</div>
+    <div class="action-buttons">${actionBtns}</div>
+    ${collectionHTML}
+    <textarea class="rationale-input" id="rationaleInput" placeholder="Optional: explain your reasoning…" rows="2">${escHtml(state.userRationale||'')}</textarea>
+    <div class="action-submit-row">
+      <button class="btn-primary" id="submitBtn" ${canSubmit()?'':'disabled'} onclick="handleSubmit()">SUBMIT →</button>
+    </div>
+  </div>`;
+}
+
+function canSubmit() {
+  if (!state.selectedAction) return false;
+  if (state.selectedAction === 'COLLECT') {
+    const item = getItem();
+    if (!item.collection_enabled || item.collection_options.length === 0) return true;
+    if (!state.collectionState.selectedUncertainty) return false;
+    if (!state.collectionState.selectedMethod) return false;
+  }
+  return true;
+}
+
+function renderCollectionSubflow(item) {
+  const cs = state.collectionState;
+  const stepLabel = !cs.selectedUncertainty ? 'STEP 1 — CHOOSE UNCERTAINTY TO RESOLVE' : !cs.selectedMethod ? 'STEP 2 — CHOOSE COLLECTION METHOD' : 'STEP 3 — COLLECTION RESULT';
+
+  let content = '';
+
+  if (!cs.selectedUncertainty) {
+    const opts = item.collection_options.map(o => `
+      <div class="collection-opt" onclick="selectUncertainty('${o.id}')">
+        <div class="collection-opt-radio"></div>
+        <span>${o.label}</span>
+        <span class="tag tag-${o.leverage==='high'?'green':o.leverage==='medium'?'amber':'muted'}" style="margin-left:auto;flex-shrink:0">${o.leverage}</span>
+      </div>`).join('');
+    content = `<div class="collection-options">${opts}</div>`;
+  } else if (!cs.selectedMethod) {
+    const methods = item.collection_methods || ["IMINT","SIGINT","HUMINT","OSINT"];
+    const chips = methods.map(m => `<button class="method-chip" onclick="selectMethod('${m}')">${m}</button>`).join('');
+    const selOpt = item.collection_options.find(o => o.id === cs.selectedUncertainty);
+    content = `
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Targeting: <strong style="color:var(--text-primary)">${selOpt?.label}</strong></div>
+      <div class="collection-methods">${chips}</div>`;
+  } else if (cs.result) {
+    const coachText = generateCollectionCoach(
+      { leverage: item.collection_options.find(o=>o.id===cs.selectedUncertainty)?.leverage, ...cs.result },
+      item
+    );
+    content = `
+      <div class="collection-result">
+        <div class="collection-result-label">COLLECTION RESULT</div>
+        ${escHtml(cs.result.result_text)}
+      </div>
+      <div style="margin-top:8px;padding:10px;background:var(--accent-green-dim);border:1px solid rgba(16,185,129,0.2);border-radius:6px;font-size:12px;line-height:1.6;color:#6EE7B7;white-space:pre-line">${escHtml(coachText)}</div>`;
+  }
+
+  return `
+  <div class="collection-panel">
+    <div class="collection-step-label">📡 COLLECTION SUBFLOW — ${stepLabel}</div>
+    ${content}
+  </div>`;
+}
+
+function renderFeedback(item) {
+  const result = state.results[item.index];
+  const color = RESULT_COLORS[result];
+  const label = RESULT_LABELS[result];
+  const coach = state.agentOutputs.coach || '';
+  const actionLabel = {ELEVATE:'Elevate',FLAG:'Flag',COLLECT:'Collect',ARCHIVE:'Archive'}[state.selectedAction]||state.selectedAction;
+  const idealLabel = {ELEVATE:'Elevate',FLAG:'Flag',COLLECT:'Collect',ARCHIVE:'Archive'}[item.v2_ideal]||item.v2_ideal;
+  return `
+  <div class="feedback-area">
+    <div class="feedback-verdict" style="--verdict-color:${color}">
+      <div class="feedback-verdict-text">${label}</div>
+      <div class="feedback-verdict-sub">You chose: ${actionLabel.toUpperCase()} — Ideal: ${idealLabel.toUpperCase()}</div>
+    </div>
+    <div class="coach-output">
+      <div class="coach-header"><span style="font-size:16px">🎖</span><span class="coach-label">AFTER-ACTION COACH</span></div>
+      <div class="coach-text">${escHtml(coach)}</div>
+    </div>
+    <div class="teaching-point">
+      <div class="tp-label">TEACHING POINT</div>
+      <div class="tp-text">${escHtml(item.teaching_point)}</div>
+    </div>
+    <button class="next-btn" id="nextBtn" onclick="handleNext()">
+      ${state.currentIndex >= state.scenarioItems.length - 1 ? 'VIEW AFTER-ACTION REVIEW →' : `NEXT ITEM (${state.currentIndex+2} / ${state.scenarioItems.length}) →`}
+    </button>
+  </div>`;
+}
+
+function renderRightPanel() {
+  const total = Object.keys(state.results).length;
+  const ideal = Object.values(state.results).filter(r=>r==='ideal').length;
+  const acceptable = Object.values(state.results).filter(r=>r==='acceptable').length;
+  const incorrect = Object.values(state.results).filter(r=>r==='incorrect').length;
+
+  // Badges
+  const activeIndicesRP = new Set(state.scenarioItems.map(i=>i.index));
+  const activeCatsRP = SCORING_CATS.map(c => ({...c, items: c.items.filter(i => activeIndicesRP.has(i))})).filter(c=>c.items.length>0);
+  let badgesHTML = activeCatsRP.map(c => {
+    const relevant = c.items.filter(i => state.results[i] !== undefined);
+    const good = relevant.filter(i => state.results[i]==='ideal'||state.results[i]==='acceptable').length;
+    const pct = relevant.length > 0 ? (good/relevant.length*100) : 0;
+    const tier = computeTier(c, state.results);
+    const tierBadge = tier ? `<span class="badge-tier tier-${tier}">${tier[0].toUpperCase()}</span>` : '';
+    const barColor = tier==='gold'?'#FDE68A':tier==='silver'?'#9CA3AF':tier==='bronze'?'#F59E0B':'#3B82F6';
+    return `<div class="badge-prog">
+      <div class="badge-prog-header"><span style="color:var(--text-secondary)">${c.icon} ${c.label}</span>${tierBadge}</div>
+      <div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${barColor}"></div></div>
+    </div>`;
+  }).join('');
+
+  // Watch Queue
+  const wqHTML = state.watchQueue.length > 0
+    ? state.watchQueue.map(id => `<div class="rp-watch-item">⚑ ${id}</div>`).join('')
+    : `<div style="font-size:10px;color:var(--text-muted);font-style:italic">Empty</div>`;
+
+  // Log
+  const logHTML = state.actionLog.slice().reverse().slice(0,15).map(l => {
+    const it = ITEMS.find(i=>i.index===l.index);  // Use full ITEMS — log may span scenarios
+    const act = ACTIONS.find(a=>a.id===l.action);
+    const tc = TYPE_COLORS[it.type]||{bg:"#374151",text:"#D1D5DB"};
+    return `<div class="log-entry">
+      <div class="log-top">
+        <span class="tag" style="background:${tc.bg};color:${tc.text};padding:1px 4px;font-size:8px">${it.type}</span>
+        <span class="log-id">${it.item_id}</span>
+        <span class="log-dot" style="background:${RESULT_COLORS[l.result]}"></span>
+      </div>
+      <div class="log-action" style="color:${act?.color||'#D1D5DB'}">${act?.icon||''} ${act?.label||l.action}</div>
+    </div>`;
+  }).join('') || `<div style="font-size:10px;color:var(--text-muted);font-style:italic">No items yet</div>`;
+
+  const scenarioColors = {original:'#3B82F6', cyber:'#06B6D4', full:'#8B5CF6'};
+  const scenarioNames  = {original:'ORIGINAL', cyber:'CYBER', full:'FULL'};
+  const scColor = scenarioColors[state.scenario] || '#3B82F6';
+  const scName  = scenarioNames[state.scenario]  || '';
+
+  document.getElementById('mainRight').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <span class="section-label" style="font-size:8px;letter-spacing:3px;margin-bottom:0">INTELLIGENCE PICTURE</span>
+      <button class="reset-btn" onclick="handleReset()">↺ RESET</button>
+    </div>
+    <div style="margin-bottom:10px">
+      <span style="font-family:var(--font-mono);font-size:8px;font-weight:700;padding:2px 8px;border-radius:10px;background:${scColor}20;color:${scColor};border:1px solid ${scColor}40">${scName} SCENARIO</span>
+    </div>
+    <div class="rp-block">
+      <div class="section-label" style="font-size:8px">PROCESSED</div>
+      <div class="rp-row"><span>Items</span><span class="rp-val">${total}/${state.scenarioItems.length}</span></div>
+      <div class="rp-row"><span>Correct</span><span class="rp-val" style="color:#10B981">${ideal}</span></div>
+      <div class="rp-row"><span>Acceptable</span><span class="rp-val" style="color:#F59E0B">${acceptable}</span></div>
+      <div class="rp-row"><span>Incorrect</span><span class="rp-val" style="color:#EF4444">${incorrect}</span></div>
+    </div>
+    <div class="rp-block">
+      <div class="section-label" style="font-size:8px">ACTION COUNTS</div>
+      <div class="rp-row"><span>⬆ Elevations</span><span class="rp-val" style="color:#EF4444">${state.counters.elevations}</span></div>
+      <div class="rp-row"><span>⚑ Flagged</span><span class="rp-val" style="color:#F59E0B">${state.counters.flags}</span></div>
+      <div class="rp-row"><span>📡 Collected</span><span class="rp-val" style="color:#06B6D4">${state.counters.collections}</span></div>
+      <div class="rp-row"><span>◫ Archived</span><span class="rp-val" style="color:#6B7280">${state.counters.archives}</span></div>
+    </div>
+    <div class="rp-block">
+      <div class="section-label" style="font-size:8px">WATCH QUEUE</div>
+      ${wqHTML}
+    </div>
+    <div class="rp-block">
+      <div class="section-label" style="font-size:8px">SKILL BADGES</div>
+      ${badgesHTML}
+    </div>
+    <div class="rp-block">
+      <div class="section-label" style="font-size:8px">RUNNING LOG</div>
+      <div style="max-height:220px;overflow-y:auto">${logHTML}</div>
+    </div>`;
+}
+
+// ── EVENT HANDLERS ───────────────────────────────────────────────────
+function attachActionEvents() {}
+
+function selectAction(id) {
+  const rationaleEl = document.getElementById('rationaleInput');
+  if (rationaleEl) state.userRationale = rationaleEl.value;
+  state.selectedAction = id;
+  if (id !== 'COLLECT') {
+    state.collectionState = { active:false, selectedUncertainty:null, selectedMethod:null, result:null };
+  }
+  renderCenterPanel();
+}
+
+function selectUncertainty(id) {
+  state.collectionState.selectedUncertainty = id;
+  state.collectionState.selectedMethod = null;
+  state.collectionState.result = null;
+  renderCenterPanel();
+}
+
+function selectMethod(method) {
+  const item = getItem();
+  state.collectionState.selectedMethod = method;
+  const uncId = state.collectionState.selectedUncertainty;
+  const outcomeData = item.collection_outcomes?.[uncId];
+  if (outcomeData) {
+    state.collectionState.result = {
+      method,
+      best_method: outcomeData.best_method,
+      leverage: item.collection_options.find(o=>o.id===uncId)?.leverage || 'medium',
+      outcome_type: outcomeData.outcome_type,
+      result_text: outcomeData.result_text,
+      threshold_effect: outcomeData.threshold_effect
+    };
+  }
+  renderCenterPanel();
+}
+
+async function handleSubmit() {
+  const rationaleEl = document.getElementById('rationaleInput');
+  if (rationaleEl) state.userRationale = rationaleEl.value;
+
+  const item = getItem();
+  const action = state.selectedAction;
+
+  // Update state
+  if (action === 'ELEVATE') {
+    state.elevatedItems.push(item.item_id);
+    state.counters.elevations++;
+  } else if (action === 'FLAG') {
+    if (!state.watchQueue.includes(item.item_id)) state.watchQueue.push(item.item_id);
+    state.counters.flags++;
+  } else if (action === 'COLLECT') {
+    state.counters.collections++;
+    if (state.collectionState.result) {
+      state.collectionRequests.push({ item_id: item.item_id, ...state.collectionState.result });
+    }
+  } else if (action === 'ARCHIVE') {
+    state.archivedItems.push(item.item_id);
+    state.counters.archives++;
+  }
+
+  // Score
+  const isIdeal = action === item.v2_ideal;
+  const isAcceptable = item.v2_acceptable.includes(action);
+  const resultType = isIdeal ? 'ideal' : isAcceptable ? 'acceptable' : 'incorrect';
+  state.results[item.index] = resultType;
+  state.actionLog.push({ index:item.index, item_id:item.item_id, action, result:resultType });
+
+  // Coach
+  if (state.useLiveAPI) {
+    try {
+      const collNote = state.collectionState.result ? `\nCollection choice: targeted "${state.collectionState.selectedUncertainty}" using ${state.collectionState.selectedMethod}. Result: ${state.collectionState.result.result_text}` : '';
+      const coachOut = await callClaudeAPI(COACH_SYS,
+        `Item: ${item.item_id} (${item.type}, ${item.reliability}): ${item.summary}\nTrainee action: ${action}\nTrainee rationale: "${state.userRationale||'none provided'}"\nIdeal: ${item.v2_ideal}\nAcceptable: ${item.v2_acceptable.join(',')}\nResult: ${resultType.toUpperCase()}\nFeedback reference: ${item.feedback[action]}\nTeaching point: ${item.teaching_point}${collNote}\nDeliver feedback directly addressing their rationale and calibration to the escalation threshold.`
+      );
+      state.agentOutputs.coach = coachOut;
+    } catch(e) {
+      state.agentOutputs.coach = generateCoach(item, action);
+    }
+  } else {
+    state.agentOutputs.coach = generateCoach(item, action);
+  }
+
+  state.phase = 'feedback';
+  renderMain();
+}
+
+function handleNext() {
+  if (state.currentIndex >= state.scenarioItems.length - 1) {
+    renderSummaryScreen();
+    goTo('summary');
+    return;
+  }
+  state.currentIndex++;
+  state.selectedAction = null;
+  state.userRationale = '';
+  state.collectionState = { active:false, selectedUncertainty:null, selectedMethod:null, result:null };
+  state.agentOutputs = {};
+  state.apiError = null;
+  state.phase = 'advising';
+  renderMain();
+  fireAgents();
+}
+
+// ── SUMMARY ──────────────────────────────────────────────────────────
+function renderSummaryScreen() {
+  const total = Object.keys(state.results).length;
+  const ideal = Object.values(state.results).filter(r=>r==='ideal').length;
+  const acceptable = Object.values(state.results).filter(r=>r==='acceptable').length;
+  const incorrect = Object.values(state.results).filter(r=>r==='incorrect').length;
+  const pct = total > 0 ? Math.round((ideal+acceptable)/total*100) : 0;
+
+  // Filter scoring cats to only items in the active scenario
+  const activeIndices = new Set(state.scenarioItems.map(i=>i.index));
+  const activeScoringCats = SCORING_CATS.map(c => ({
+    ...c,
+    items: c.items.filter(i => activeIndices.has(i))
+  })).filter(c => c.items.length > 0);
+
+  // Build escalation calibration narrative using scenario items only
+  const escalationItems = activeScoringCats[0]?.items || [];
+  const overElevated = state.actionLog.filter(l => {
+    const item = state.scenarioItems.find(i=>i.index===l.index);
+    return l.action==='ELEVATE' && item && item.v2_ideal !== 'ELEVATE' && !item.v2_acceptable.includes('ELEVATE');
+  }).length;
+  const underElevated = state.actionLog.filter(l => {
+    const item = state.scenarioItems.find(i=>i.index===l.index);
+    return item && item.v2_ideal==='ELEVATE' && l.action !== 'ELEVATE' && !item.v2_acceptable.includes(l.action);
+  }).length;
+
+  let coachNarrative = '';
+  if (overElevated > underElevated && overElevated >= 2) {
+    coachNarrative = `Your primary tendency is over-elevation — you escalated ${overElevated} items that did not meet threshold. This creates alert fatigue and erodes commander trust. In a sustained scenario, over-elevation is as dangerous as under-elevation: it trains commanders to discount your channel. Reserve elevation for items that clearly cross the CCIR boundary.`;
+  } else if (underElevated > overElevated && underElevated >= 2) {
+    coachNarrative = `Your primary tendency is under-elevation — you failed to elevate ${underElevated} items that required immediate command awareness. In a real scenario, some of those represent force protection failures or missed phase-transition indicators. Recalibrate: when a CCIR condition is met, hesitation has operational cost.`;
+  } else if (state.counters.collections >= 5) {
+    coachNarrative = `You used collection ${state.counters.collections} times — review whether each addressed a threshold-relevant uncertainty. Collection is valuable when it changes your escalation decision. If it didn't materially affect whether to elevate, it was an attention cost, not an analytical asset.`;
+  } else if (pct >= 85) {
+    coachNarrative = `Strong performance — ${pct}% accuracy across the scenario. Your escalation threshold calibration was generally sound. Focus area for improvement: ensure watch queue usage is active (flagged items should be tracked until resolved or corroborated, not just logged).`;
+  } else {
+    coachNarrative = `Your escalation judgment needs calibration. The primary question for each item: does this item require commander awareness now? If yes — elevate. If the signal is real but not yet threshold — flag. If more evidence would change your decision — collect. If none of those — archive.`;
+  }
+
+  const badgesHTML = activeScoringCats.map(c => {
+    const tier = computeTier(c, state.results);
+    const bgColor = tier==='gold'?'#FDE68A':tier==='silver'?'#E5E7EB':tier==='bronze'?'#FED7AA':'#1E2D45';
+    const txtColor = tier ? '#1F2937' : '#4A6080';
+    return `<div class="summary-badge-row">
+      <span>${c.icon} ${c.label}</span>
+      <span class="badge-tier" style="background:${bgColor};color:${txtColor};padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700">${tier?tier.toUpperCase():'—'}</span>
+    </div>`;
+  }).join('');
+
+  const scenarioLabels = {original:'ORIGINAL — 28 ITEMS', cyber:'CYBER MODULE — 15 ITEMS', full:'FULL SCENARIO — 43 ITEMS'};
+  const scenarioColors = {original:'var(--accent-blue)', cyber:'var(--accent-cyan)', full:'var(--accent-purple)'};
+
+  document.getElementById('summaryInner').innerHTML = `
+    <div class="summary-header">
+      <div class="tag tag-red" style="margin-bottom:10px">AFTER-ACTION REVIEW</div>
+      <h2 class="summary-title">SCENARIO COMPLETE</h2>
+      <div class="summary-sub" style="display:flex;align-items:center;gap:10px">
+        GREY HARBOR V3
+        <span style="font-family:var(--font-mono);font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:${scenarioColors[state.scenario]}20;color:${scenarioColors[state.scenario]};border:1px solid ${scenarioColors[state.scenario]}40">${scenarioLabels[state.scenario]}</span>
+      </div>
+    </div>
+
+    <div class="summary-counters">
+      <div class="summary-stat" style="--stat-color:var(--text-primary)">
+        <div class="summary-stat-num">${pct}%</div>
+        <div class="summary-stat-label">Accuracy</div>
+      </div>
+      <div class="summary-stat" style="--stat-color:#10B981;border-color:#10B98130">
+        <div class="summary-stat-num" style="color:#10B981">${ideal}</div>
+        <div class="summary-stat-label">Correct</div>
+      </div>
+      <div class="summary-stat" style="--stat-color:#F59E0B;border-color:#F59E0B30">
+        <div class="summary-stat-num" style="color:#F59E0B">${acceptable}</div>
+        <div class="summary-stat-label">Acceptable</div>
+      </div>
+      <div class="summary-stat" style="--stat-color:#EF4444;border-color:#EF444430">
+        <div class="summary-stat-num" style="color:#EF4444">${incorrect}</div>
+        <div class="summary-stat-label">Incorrect</div>
+      </div>
+    </div>
+
+    <div class="summary-action-counts">
+      <div class="summary-action-stat" style="border-color:#EF444430">
+        <div class="summary-action-num" style="color:#EF4444">${state.counters.elevations}</div>
+        <div class="summary-action-label">⬆ Elevations</div>
+      </div>
+      <div class="summary-action-stat" style="border-color:#F59E0B30">
+        <div class="summary-action-num" style="color:#F59E0B">${state.counters.flags}</div>
+        <div class="summary-action-label">⚑ Flagged</div>
+      </div>
+      <div class="summary-action-stat" style="border-color:#06B6D430">
+        <div class="summary-action-num" style="color:#06B6D4">${state.counters.collections}</div>
+        <div class="summary-action-label">📡 Collected</div>
+      </div>
+      <div class="summary-action-stat" style="border-color:#6B728030">
+        <div class="summary-action-num" style="color:#6B7280">${state.counters.archives}</div>
+        <div class="summary-action-label">◫ Archived</div>
+      </div>
+    </div>
+
+    <div class="summary-coach">
+      <div class="summary-coach-label">🎖 ESCALATION CALIBRATION ASSESSMENT</div>
+      <div class="summary-coach-text">${escHtml(coachNarrative)}</div>
+    </div>
+
+    <div class="summary-badges">
+      <div class="section-label" style="font-size:9px">SKILL ASSESSMENT</div>
+      ${badgesHTML}
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="restart-btn" style="flex:1;padding:13px;font-size:11px" onclick="restartSimulator()">↺ RUN THIS SCENARIO AGAIN</button>
+      <button class="restart-btn" style="flex:1;padding:13px;font-size:11px;border-color:var(--accent-blue);color:var(--accent-blue)" onclick="chooseNewScenario()">⇄ CHOOSE DIFFERENT SCENARIO</button>
+    </div>
+  `;
+}
+
+function resetState() {
+  state.currentIndex = 0;
+  state.agentOutputs = {};
+  state.selectedAction = null;
+  state.userRationale = '';
+  state.results = {};
+  state.actionLog = [];
+  state.watchQueue = [];
+  state.archivedItems = [];
+  state.elevatedItems = [];
+  state.collectionRequests = [];
+  state.pendingCollectionResults = [];
+  state.contextQuestionChosen = null;
+  state.counters = { elevations:0, flags:0, collections:0, archives:0 };
+  state.collectionState = { active:false, selectedUncertainty:null, selectedMethod:null, result:null };
+  state.apiError = null;
+}
+
+// Restart the same scenario from the beginning
+function restartSimulator() {
+  resetState();
+  // Re-populate scenarioItems for the same scenario
+  state.scenarioItems = buildScenarioItems(state.scenario);
+  // Reset context question UI so it's fresh when they get there
+  document.querySelectorAll('.context-q').forEach(el => el.classList.remove('selected'));
+  const ansEl = document.getElementById('contextAnswer');
+  if (ansEl) { ansEl.style.display = 'none'; ansEl.innerHTML = ''; }
+  document.getElementById('contextBeginBtn').disabled = true;
+  // Go back to theater brief (scenario already chosen, no need to re-select)
+  renderTheaterBrief();
+  goTo('theater');
+}
+
+// Go back to scenario selector (keep API key, reset everything else)
+function chooseNewScenario() {
+  resetState();
+  state.scenario = 'original';
+  state.scenarioItems = [];
+  // Reset scenario card selection UI
+  ['original','cyber','full'].forEach(s => {
+    const el = document.getElementById('sc-'+s);
+    if (el) el.classList.remove('selected');
+  });
+  document.getElementById('scenarioContinueBtn').disabled = true;
+  // Reset context question UI
+  document.querySelectorAll('.context-q').forEach(el => el.classList.remove('selected'));
+  const ansEl = document.getElementById('contextAnswer');
+  if (ansEl) { ansEl.style.display = 'none'; ansEl.innerHTML = ''; }
+  document.getElementById('contextBeginBtn').disabled = true;
+  goTo('scenario');
+}
+
+// Reset button — available during scenario
+function handleReset() {
+  restartSimulator();
+}
+
+// Build the scenarioItems array for a given scenario key
+function buildScenarioItems(scenario) {
+  if (scenario === 'original') return ITEMS.filter(i => ORIGINAL_INDICES.includes(i.index));
+  if (scenario === 'cyber')    return ITEMS.filter(i => CYBER_INDICES.includes(i.index));
+  return ITEMS; // full
+}
+
+// Scenario selector screen handlers
+function selectScenario(scenario) {
+  state.scenario = scenario;
+  ['original','cyber','full'].forEach(s => {
+    document.getElementById('sc-'+s).classList.toggle('selected', s === scenario);
+  });
+  document.getElementById('scenarioContinueBtn').disabled = false;
+}
+
+function confirmScenario() {
+  state.scenarioItems = buildScenarioItems(state.scenario);
+  // Update theater brief content based on scenario
+  renderTheaterBrief();
+  goTo('theater');
+}
+
+// Render theater brief dynamically (original vs cyber vs full)
+function renderTheaterBrief() {
+  const isCyber = state.scenario === 'cyber';
+  const isFull  = state.scenario === 'full';
+
+  // Update title
+  const titleEl = document.querySelector('.theater-title');
+  if (titleEl) {
+    if (isCyber) titleEl.textContent = 'GREY HARBOR — CYBER MODULE';
+    else if (isFull) titleEl.textContent = 'GREY HARBOR — FULL SCENARIO';
+    else titleEl.textContent = 'GREY HARBOR CORRIDOR';
+  }
+
+  const theaterInner = document.querySelector('.theater-inner');
+  if (!theaterInner) return;
+
+  // Remove any previously injected cyber blocks
+  theaterInner.querySelectorAll('[data-cyber]').forEach(el => el.remove());
+
+  if (isCyber || isFull) {
+    const cyberDiv = document.createElement('div');
+    cyberDiv.setAttribute('data-cyber', '1');
+    cyberDiv.innerHTML = `
+      <div class="theater-block" style="border-color:rgba(6,182,212,.35)">
+        <div class="theater-block-label" style="color:var(--accent-cyan)">Cyber Threat Context</div>
+        <div class="theater-block-text">Adversary cyber activity has been assessed as persistent and <strong>low-visibility</strong>. Observed TTPs include <strong>credential-based VPN access</strong>, <strong>third-party relationship exploitation</strong>, and <strong>living-off-the-land persistence</strong>. The adversary prioritizes collection over disruption — elevation thresholds are therefore tied to <strong>confirmed system access</strong> or <strong>multi-source alignment on adversary intent</strong>, not mere probing activity.</div>
+      </div>
+      <div class="theater-block" style="border-color:rgba(6,182,212,.35)">
+        <div class="theater-block-label" style="color:var(--accent-cyan)">Key Cyber Vulnerabilities</div>
+        <ul class="vuln-list">
+          <li><strong>Coalition VPN gateway</strong> — primary remote access path for HQ and port logistics</li>
+          <li><strong>Port scheduling environment</strong> — mission-critical logistics coordination system</li>
+          <li><strong>Mission-planning share</strong> — operational planning data, broadly accessible to authorized users</li>
+          <li><strong>Directory services</strong> — account creation and privilege management on backup sync host</li>
+          <li><strong>Third-party contractor credentials</strong> — dormant accounts and maintenance access windows</li>
+        </ul>
+      </div>`;
+    // Insert before the continue wrapper div (a direct child of theaterInner)
+    const continueWrap = document.getElementById('theaterContinueWrap');
+    if (continueWrap && continueWrap.parentNode === theaterInner) {
+      theaterInner.insertBefore(cyberDiv, continueWrap);
+    } else {
+      theaterInner.appendChild(cyberDiv);
+    }
+  }
+}
+
+// ── SCORING HELPERS ──────────────────────────────────────────────────
+function computeTier(cat, results) {
+  const relevant = cat.items.filter(i => results[i] !== undefined);
+  if (relevant.length === 0) return null;
+  const acc = relevant.filter(i => results[i]==='ideal'||results[i]==='acceptable').length / relevant.length;
+  if (acc >= cat.thresholds.gold) return 'gold';
+  if (acc >= cat.thresholds.silver) return 'silver';
+  if (acc >= cat.thresholds.bronze) return 'bronze';
+  return null;
+}
+
+function escHtml(s) {
+  return String(s||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\n/g,'<br>');
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────
+document.getElementById('landingContinue').onclick = () => {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  state.apiKey = key;
+  state.useLiveAPI = key.length > 10;
+  goTo('doctrine');
+};
+
+document.getElementById('apiKeyInput').addEventListener('input', function() {
+  const key = this.value.trim();
+  const pill = document.getElementById('modePill');
+  if (key.length > 10) {
+    pill.className = 'mode-pill live';
+    pill.innerHTML = '<span class="mode-dot"></span>LIVE API MODE';
+  } else {
+    pill.className = 'mode-pill prebaked';
+    pill.innerHTML = '<span class="mode-dot"></span>PRE-BAKED MODE';
+  }
+});
+
+// Close modals on backdrop click
+document.getElementById('doctrineModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal('doctrineModal');
+});
+
+// Init context questions
+renderContextQuestions();
+
+</script>
+</body>
+</html>
